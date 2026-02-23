@@ -204,17 +204,6 @@ async def supabase_save_user(chat_id, phone, first_name="", username=""):
         logger.error(f"Supabase save error: {e}")
     return False
 
-async def request_phone(chat_id):
-    await telegram_send_message(
-        chat_id,
-        "Для начала поделитесь, пожалуйста, Вашим номером телефона.",
-        reply_markup={
-            "keyboard": [[{"text": "Поделиться номером", "request_contact": True}]],
-            "resize_keyboard": True,
-            "one_time_keyboard": True
-        }
-    )
-
 async def send_typing_action(chat_id):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendChatAction"
@@ -471,54 +460,11 @@ async def telegram_webhook(update: dict, request: Request):
             text = message.get("text", "").strip()
             voice = message.get("voice")
             photo = message.get("photo")
-            contact = message.get("contact")
 
-            logger.info(f"chat_id={chat_id} text={text[:50] if text else ''} voice={bool(voice)} photo={bool(photo)} contact={bool(contact)}")
-
-            # Обработка контакта — сохраняем номер и удаляем сообщение
-            if contact:
-                phone = contact.get("phone_number", "")
-                first_name = contact.get("first_name", "")
-                username = message.get("from", {}).get("username", "")
-                message_id = message.get("message_id")
-                logger.info(f"Contact received: chat_id={chat_id}, phone={phone}")
-                # Удаляем сообщение с номером из чата
-                if message_id:
-                    try:
-                        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
-                            await client.post(
-                                f"https://api.telegram.org/bot{TOKEN}/deleteMessage",
-                                json={"chat_id": chat_id, "message_id": message_id}
-                            )
-                    except Exception as e:
-                        logger.error(f"Delete message error: {e}")
-                saved = await supabase_save_user(chat_id, phone, first_name, username)
-                if saved:
-                    await telegram_send_message(
-                        chat_id,
-                        "Спасибо! Я Вас запомнила. Задавайте Ваш вопрос.",
-                        reply_markup={"remove_keyboard": True}
-                    )
-                else:
-                    await telegram_send_message(chat_id, "Произошла ошибка при сохранении. Попробуйте ещё раз.")
-                return {"ok": True}
-
-            # Проверяем регистрацию — если Supabase настроен
-            user = None
-            if SUPABASE_KEY:
-                user = await supabase_get_user(chat_id)
-                logger.info(f"User lookup: chat_id={chat_id}, found={bool(user)}")
+            logger.info(f"chat_id={chat_id} text={text[:50] if text else ''} voice={bool(voice)} photo={bool(photo)}")
 
             if text == "/start":
-                if user or not SUPABASE_KEY:
-                    await telegram_send_message(chat_id, "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос.")
-                else:
-                    await request_phone(chat_id)
-                return {"ok": True}
-
-            # Если Supabase настроен и номер не сохранён — просим
-            if SUPABASE_KEY and not user:
-                await request_phone(chat_id)
+                await telegram_send_message(chat_id, "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос.")
                 return {"ok": True}
 
             if voice:
@@ -836,6 +782,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 let selectedModel='gemini-3-flash-preview';
 let proUnlocked=localStorage.getItem('pantera_pro')==='1';
 let userPhone='';
+let userChatId='';
 const tg=window.Telegram&&window.Telegram.WebApp;
 const isTgWebApp=tg&&tg.initData&&tg.initData.length>0;
 
@@ -845,12 +792,28 @@ if(isTgWebApp){
   tg.expand();
   tg.setHeaderColor('#050505');
   tg.setBackgroundColor('#050505');
+  if(tg.initDataUnsafe&&tg.initDataUnsafe.user){
+    userChatId=String(tg.initDataUnsafe.user.id);
+  }
 }
 
-function initUI(){
+async function initUI(){
   if(proUnlocked) document.getElementById('proCard').classList.add('unlocked');
-  // if not in Telegram, show fallback phone input
-  if(!isTgWebApp){
+  // Проверяем номер в базе по chat_id
+  if(userChatId){
+    try{
+      const resp=await fetch('/pantera/user/'+userChatId);
+      const data=await resp.json();
+      if(data.ok&&data.phone){
+        userPhone=data.phone;
+        document.getElementById('sharePhoneBtn').style.display='none';
+        document.getElementById('phoneShared').style.display='block';
+        document.getElementById('phoneDisplay').textContent=formatPhone(userPhone);
+      }
+    }catch(e){}
+  }
+  // if not in Telegram and no phone, show fallback input
+  if(!isTgWebApp&&!userPhone){
     document.getElementById('sharePhoneBtn').style.display='none';
     document.getElementById('phoneInputFallback').style.display='block';
   }
@@ -932,7 +895,7 @@ async function unlockPro(){
   try{
     const resp=await fetch('/pantera/unlock',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({phone:phone,code:code})
+      body:JSON.stringify({phone:phone,code:code,chat_id:userChatId})
     });
     const data=await resp.json();
     if(data.ok){
@@ -1034,13 +997,24 @@ async def save_config_endpoint(request: Request):
         logger.error(f"Save config error: {e}")
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
+@app.get("/pantera/user/{chat_id}")
+async def get_user_phone(chat_id: int):
+    user = await supabase_get_user(chat_id)
+    if user:
+        return JSONResponse({"ok": True, "phone": user.get("phone", "")})
+    return JSONResponse({"ok": False})
+
 @app.post("/pantera/unlock")
 async def unlock_pro(request: Request):
     try:
         body = await request.json()
         phone = body.get("phone", "").strip()
         code = body.get("code", "").strip()
+        chat_id = body.get("chat_id")
         if code == ACCESS_CODE:
+            # Если есть chat_id и номер, сохраняем в Supabase
+            if chat_id and phone:
+                await supabase_save_user(int(chat_id), phone)
             logger.info(f"Pro unlocked by phone: {phone}")
             return JSONResponse({"ok": True})
         return JSONResponse({"ok": False, "error": "Неверный код"})
