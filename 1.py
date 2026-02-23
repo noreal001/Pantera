@@ -231,7 +231,7 @@ async def ask_gemini(question, user_id=None):
         temperature = cfg["temperature"]
         thinking_budget = cfg["thinking_budget"]
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model}:generateContent?key={GEMINI_API_KEY}"
 
         contents = []
 
@@ -249,7 +249,7 @@ async def ask_gemini(question, user_id=None):
         contents.append({"role": "user", "parts": [{"text": question}]})
 
         data = {
-            "system_instruction": {
+            "systemInstruction": {
                 "parts": [{"text": SYSTEM_PROMPT}]
             },
             "contents": contents,
@@ -262,17 +262,19 @@ async def ask_gemini(question, user_id=None):
             }
         }
 
+        logger.info(f"Gemini request: model={model}, url_base=aiplatform.googleapis.com")
         timeout = aiohttp.ClientTimeout(total=60)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(url, json=data) as resp:
                 if resp.status != 200:
                     error_text = await resp.text()
-                    logger.error(f"Gemini API error: {resp.status} - {error_text}")
+                    logger.error(f"Gemini API error: {resp.status} - {error_text[:500]}")
                     return None
 
                 result = await resp.json()
                 candidates = result.get("candidates", [])
                 if not candidates:
+                    logger.error(f"Gemini: no candidates in response")
                     return None
 
                 parts = candidates[0].get("content", {}).get("parts", [])
