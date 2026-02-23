@@ -303,6 +303,7 @@ async def recognize_voice_content(file_content):
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(update: dict, request: Request):
     try:
+        logger.info(f"Webhook received update: {list(update.keys())}")
         if "message" in update:
             message = update["message"]
             chat_id = message["chat"]["id"]
@@ -338,6 +339,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>PANTERA</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -346,10 +348,11 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   --glass-hover:rgba(255,255,255,0.08);--text-primary:rgba(255,255,255,0.92);
   --text-secondary:rgba(255,255,255,0.4);--text-muted:rgba(255,255,255,0.18);--radius:20px;
 }
-html{font-size:16px}
+html{font-size:16px;position:fixed;width:100%;height:100%;overflow:hidden}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text-primary);
-  min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;
-  padding:20px;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  padding:20px;overflow:hidden;-webkit-font-smoothing:antialiased;
+  position:fixed;touch-action:manipulation;overscroll-behavior:none;-webkit-overflow-scrolling:none}
 body::before{content:'';position:fixed;top:-40%;left:-20%;width:140%;height:140%;
   background:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,0.015) 0%,transparent 60%),
   radial-gradient(ellipse at 70% 80%,rgba(255,255,255,0.01) 0%,transparent 50%);
@@ -433,6 +436,21 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .status{text-align:center;margin-top:20px;font-size:.6rem;font-weight:300;color:var(--text-muted);
   letter-spacing:.2em;text-transform:uppercase;min-height:18px;transition:all .4s}
 .status.ok{color:rgba(255,255,255,.7)} .status.err{color:rgba(255,80,80,.7)}
+
+/* success overlay */
+.success-overlay{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.92);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  opacity:0;pointer-events:none;transition:opacity .4s}
+.success-overlay.show{opacity:1;pointer-events:auto}
+.success-overlay .check-wrap{text-align:center;animation:scaleIn .5s cubic-bezier(.16,1,.3,1)}
+.success-overlay .check-circle{width:80px;height:80px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;
+  margin:0 auto 20px;animation:pulseGlow 1.5s ease-in-out infinite}
+.success-overlay .check-circle svg{width:36px;height:36px}
+.success-overlay .check-text{font-size:.7rem;font-weight:500;letter-spacing:.4em;text-transform:uppercase;
+  color:rgba(255,255,255,.5)}
+@keyframes scaleIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+@keyframes pulseGlow{0%,100%{box-shadow:0 0 20px rgba(255,255,255,.05)}50%{box-shadow:0 0 40px rgba(255,255,255,.15)}}
 
 /* ---- MODAL ---- */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(20px);
@@ -567,7 +585,15 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 
     <div class="step">
       <div class="step-num">шаг 2 — номер телефона</div>
-      <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 (___) ___-__-__" maxlength="18">
+      <div id="phoneShared" style="display:none;padding:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;font-size:.85rem;color:rgba(255,255,255,.7)">
+        <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 16 16" fill="none" stroke="rgba(120,255,120,.6)" stroke-width="1.5" stroke-linecap="round"><path d="M2 8.5L6 12.5L14 3.5"/></svg>
+        <span id="phoneDisplay"></span>
+      </div>
+      <button class="channel-btn" id="sharePhoneBtn" onclick="requestPhone()" style="cursor:pointer;border:none;font-family:inherit">
+        <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+        Поделиться номером
+      </button>
+      <input type="tel" class="phone-input" id="phoneInputFallback" placeholder="+7 (___) ___-__-__" maxlength="18" style="display:none;margin-top:8px">
     </div>
 
     <div class="step">
@@ -580,13 +606,39 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
   </div>
 </div>
 
+<!-- SUCCESS OVERLAY -->
+<div class="success-overlay" id="successOverlay">
+  <div class="check-wrap">
+    <div class="check-circle">
+      <svg viewBox="0 0 36 36" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 18L15 25L28 11"/>
+      </svg>
+    </div>
+    <div class="check-text">применено</div>
+  </div>
+</div>
+
 <script>
 let selectedModel='gemini-3-flash-preview';
 let proUnlocked=localStorage.getItem('pantera_pro')==='1';
+let userPhone='';
+const tg=window.Telegram&&window.Telegram.WebApp;
+const isTgWebApp=tg&&tg.initData&&tg.initData.length>0;
+
+// init telegram webapp
+if(isTgWebApp){
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor('#050505');
+  tg.setBackgroundColor('#050505');
+}
 
 function initUI(){
-  if(proUnlocked){
-    document.getElementById('proCard').classList.add('unlocked');
+  if(proUnlocked) document.getElementById('proCard').classList.add('unlocked');
+  // if not in Telegram, show fallback phone input
+  if(!isTgWebApp){
+    document.getElementById('sharePhoneBtn').style.display='none';
+    document.getElementById('phoneInputFallback').style.display='block';
   }
 }
 initUI();
@@ -598,11 +650,8 @@ function selectModel(el){
 }
 
 function handleProClick(el){
-  if(proUnlocked){
-    selectModel(el);
-  }else{
-    document.getElementById('proModal').classList.add('show');
-  }
+  if(proUnlocked){selectModel(el)}
+  else{document.getElementById('proModal').classList.add('show')}
 }
 
 function closeModal(){
@@ -610,8 +659,35 @@ function closeModal(){
   document.getElementById('modalError').textContent='';
 }
 
-// phone mask
-document.getElementById('phoneInput').addEventListener('input',function(e){
+// Telegram native phone request
+function requestPhone(){
+  if(isTgWebApp&&tg.requestContact){
+    tg.requestContact(function(ok,evt){
+      if(ok&&evt&&evt.responseUnsafe&&evt.responseUnsafe.contact){
+        const contact=evt.responseUnsafe.contact;
+        userPhone=contact.phone_number||'';
+        document.getElementById('sharePhoneBtn').style.display='none';
+        document.getElementById('phoneShared').style.display='block';
+        document.getElementById('phoneDisplay').textContent=formatPhone(userPhone);
+      }
+    });
+  }else{
+    // fallback: show manual input
+    document.getElementById('sharePhoneBtn').style.display='none';
+    document.getElementById('phoneInputFallback').style.display='block';
+  }
+}
+
+function formatPhone(p){
+  let d=p.replace(/\D/g,'');
+  if(d.startsWith('8'))d='7'+d.slice(1);
+  if(!d.startsWith('7')&&d.length===10)d='7'+d;
+  if(d.length>=11)return '+'+d[0]+' ('+d.slice(1,4)+') '+d.slice(4,7)+'-'+d.slice(7,9)+'-'+d.slice(9,11);
+  return '+'+d;
+}
+
+// fallback phone mask
+document.getElementById('phoneInputFallback').addEventListener('input',function(e){
   let v=e.target.value.replace(/\D/g,'');
   if(v.startsWith('8'))v='7'+v.slice(1);
   if(!v.startsWith('7'))v='7'+v;
@@ -623,7 +699,7 @@ document.getElementById('phoneInput').addEventListener('input',function(e){
   e.target.value=f;
 });
 
-// code mask: 888 888
+// code mask
 document.getElementById('codeInput').addEventListener('input',function(e){
   let v=e.target.value.replace(/\D/g,'').slice(0,6);
   if(v.length>3)v=v.slice(0,3)+' '+v.slice(3);
@@ -631,17 +707,17 @@ document.getElementById('codeInput').addEventListener('input',function(e){
 });
 
 async function unlockPro(){
-  const phone=document.getElementById('phoneInput').value.replace(/\D/g,'');
+  const fallbackInput=document.getElementById('phoneInputFallback');
+  const phone=userPhone||fallbackInput.value.replace(/\D/g,'');
   const code=document.getElementById('codeInput').value.replace(/\D/g,'');
   const err=document.getElementById('modalError');
 
-  if(phone.length<11){err.textContent='Введите номер телефона';return}
+  if(phone.length<10){err.textContent='Поделитесь номером телефона';return}
   if(code.length<6){err.textContent='Введите 6-значный код';return}
 
   try{
     const resp=await fetch('/pantera/unlock',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({phone:phone,code:code})
     });
     const data=await resp.json();
@@ -651,6 +727,7 @@ async function unlockPro(){
       document.getElementById('proCard').classList.add('unlocked');
       closeModal();
       selectModel(document.getElementById('proCard'));
+      if(isTgWebApp)tg.showAlert('Хищница разблокирована');
     }else{
       err.textContent=data.error||'Неверный код';
     }
@@ -659,7 +736,6 @@ async function unlockPro(){
   }
 }
 
-// close on overlay click
 document.getElementById('proModal').addEventListener('click',function(e){
   if(e.target===this)closeModal();
 });
@@ -679,9 +755,19 @@ async function saveConfig(){
     });
     const data=await resp.json();
     if(data.ok){
-      btn.textContent='готово';btn.classList.add('saved');
-      status.textContent='настройки сохранены';status.className='status ok';
-      setTimeout(()=>{btn.textContent='применить';btn.classList.remove('saved')},2500);
+      // show success overlay
+      document.getElementById('successOverlay').classList.add('show');
+      // haptic feedback in Telegram
+      if(isTgWebApp&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');
+      // close app after delay
+      setTimeout(()=>{
+        if(isTgWebApp){tg.close()}
+        else{
+          document.getElementById('successOverlay').classList.remove('show');
+          btn.textContent='применить';
+          status.textContent='настройки сохранены';status.className='status ok';
+        }
+      },1200);
     }else{throw new Error('fail')}
   }catch(e){
     btn.textContent='ошибка';status.textContent='не удалось сохранить';status.className='status err';
@@ -766,9 +852,12 @@ async def startup_event():
     base_url = os.getenv("WEBHOOK_BASE_URL")
     if base_url:
         try:
-            await set_telegram_webhook(base_url)
+            result = await set_telegram_webhook(base_url)
+            logger.info(f"Webhook result: {result}")
         except Exception as e:
             logger.error(f"Failed to set webhook: {e}")
+    else:
+        logger.error("WEBHOOK_BASE_URL not set! Bot will NOT receive messages!")
 
 @app.on_event("shutdown")
 async def shutdown_event():
