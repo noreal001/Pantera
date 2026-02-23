@@ -336,310 +336,454 @@ ADMIN_HTML = """<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PANTERA Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PANTERA</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family:'Inter',sans-serif;
-    background:#0a0a0a;
-    color:#e0e0e0;
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:20px;
-  }
-  .container {
-    width:100%;
-    max-width:480px;
-  }
-  .logo {
-    text-align:center;
-    margin-bottom:32px;
-  }
-  .logo h1 {
-    font-size:28px;
-    font-weight:700;
-    letter-spacing:6px;
-    color:#c8a24e;
-    text-transform:uppercase;
-  }
-  .logo p {
-    font-size:12px;
-    color:#555;
-    letter-spacing:3px;
-    margin-top:4px;
-  }
-  .section {
-    margin-bottom:24px;
-  }
-  .section-title {
-    font-size:11px;
-    font-weight:600;
-    letter-spacing:2px;
-    color:#666;
-    text-transform:uppercase;
-    margin-bottom:12px;
-  }
-  .model-grid {
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-  }
-  .model-card {
-    background:#141414;
-    border:2px solid #222;
-    border-radius:14px;
-    padding:20px 16px;
-    cursor:pointer;
-    transition:all 0.3s ease;
-    text-align:center;
-    position:relative;
-    overflow:hidden;
-  }
-  .model-card:hover {
-    border-color:#333;
-    background:#1a1a1a;
-  }
-  .model-card.active {
-    border-color:#c8a24e;
-    background:#1a1708;
-  }
-  .model-card.active::after {
-    content:'';
-    position:absolute;
-    top:0;left:0;right:0;
-    height:2px;
-    background:linear-gradient(90deg,transparent,#c8a24e,transparent);
-  }
-  .model-icon {
-    font-size:32px;
-    margin-bottom:10px;
-    display:block;
-  }
-  .model-name {
-    font-size:15px;
-    font-weight:600;
-    color:#fff;
-    margin-bottom:4px;
-  }
-  .model-sub {
-    font-size:10px;
-    color:#555;
-    letter-spacing:1px;
-  }
-  .model-id {
-    font-size:9px;
-    color:#333;
-    margin-top:8px;
-    font-family:monospace;
-  }
-  .slider-box {
-    background:#141414;
-    border:1px solid #1e1e1e;
-    border-radius:14px;
-    padding:20px;
-    margin-bottom:12px;
-  }
-  .slider-header {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:14px;
-  }
-  .slider-label {
-    font-size:13px;
-    font-weight:500;
-    color:#aaa;
-  }
-  .slider-value {
-    font-size:18px;
-    font-weight:700;
-    color:#c8a24e;
-    font-family:monospace;
-    min-width:50px;
-    text-align:right;
-  }
-  input[type=range] {
-    -webkit-appearance:none;
-    width:100%;
-    height:4px;
-    background:#222;
-    border-radius:2px;
-    outline:none;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance:none;
-    width:20px;
-    height:20px;
-    border-radius:50%;
-    background:#c8a24e;
-    cursor:pointer;
-    box-shadow:0 0 10px rgba(200,162,78,0.3);
-    transition:box-shadow 0.2s;
-  }
-  input[type=range]::-webkit-slider-thumb:hover {
-    box-shadow:0 0 20px rgba(200,162,78,0.5);
-  }
-  .slider-hints {
-    display:flex;
-    justify-content:space-between;
-    margin-top:8px;
-    font-size:9px;
-    color:#444;
-    letter-spacing:0.5px;
-  }
-  .save-btn {
-    width:100%;
-    padding:16px;
-    background:linear-gradient(135deg,#c8a24e,#a07c2e);
-    border:none;
-    border-radius:14px;
-    color:#0a0a0a;
-    font-size:14px;
-    font-weight:700;
-    letter-spacing:2px;
-    text-transform:uppercase;
-    cursor:pointer;
-    transition:all 0.3s;
-    margin-top:8px;
-  }
-  .save-btn:hover {
-    background:linear-gradient(135deg,#d4af5a,#b08a34);
-    box-shadow:0 4px 24px rgba(200,162,78,0.3);
-  }
-  .save-btn:active {
-    transform:scale(0.98);
-  }
-  .save-btn.saved {
-    background:linear-gradient(135deg,#2e7d32,#1b5e20);
-    color:#fff;
-  }
-  .status-bar {
-    text-align:center;
-    margin-top:16px;
-    font-size:11px;
-    color:#444;
-    letter-spacing:1px;
-    min-height:20px;
-  }
-  .status-bar.ok { color:#4caf50; }
-  .status-bar.err { color:#f44336; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#050505;
+  --surface:rgba(255,255,255,0.03);
+  --glass:rgba(255,255,255,0.04);
+  --glass-border:rgba(255,255,255,0.06);
+  --glass-hover:rgba(255,255,255,0.08);
+  --text-primary:rgba(255,255,255,0.92);
+  --text-secondary:rgba(255,255,255,0.4);
+  --text-muted:rgba(255,255,255,0.18);
+  --accent:rgba(255,255,255,0.9);
+  --glow:rgba(255,255,255,0.06);
+  --success:rgba(255,255,255,0.7);
+  --radius:20px;
+}
+
+html{font-size:16px}
+
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:var(--bg);
+  color:var(--text-primary);
+  min-height:100vh;
+  min-height:100dvh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ambient glow */
+body::before{
+  content:'';
+  position:fixed;
+  top:-40%;left:-20%;
+  width:140%;height:140%;
+  background:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,0.015) 0%,transparent 60%),
+             radial-gradient(ellipse at 70% 80%,rgba(255,255,255,0.01) 0%,transparent 50%);
+  pointer-events:none;
+  animation:breathe 12s ease-in-out infinite alternate;
+}
+@keyframes breathe{
+  0%{opacity:0.6;transform:scale(1)}
+  100%{opacity:1;transform:scale(1.05)}
+}
+
+.container{
+  width:100%;
+  max-width:440px;
+  position:relative;
+  z-index:1;
+}
+
+/* ---- HEADER ---- */
+.header{
+  text-align:center;
+  margin-bottom:48px;
+  padding-top:12px;
+}
+.header h1{
+  font-size:3.2rem;
+  font-weight:800;
+  letter-spacing:0.25em;
+  text-transform:uppercase;
+  color:var(--text-primary);
+  line-height:1;
+  margin-bottom:8px;
+  text-shadow:0 0 80px rgba(255,255,255,0.08);
+}
+.header .sub{
+  font-size:0.65rem;
+  font-weight:300;
+  letter-spacing:0.5em;
+  text-transform:uppercase;
+  color:var(--text-muted);
+}
+
+/* ---- SECTION ---- */
+.section{margin-bottom:20px}
+.section-label{
+  font-size:0.6rem;
+  font-weight:600;
+  letter-spacing:0.3em;
+  text-transform:uppercase;
+  color:var(--text-muted);
+  margin-bottom:12px;
+  padding-left:4px;
+}
+
+/* ---- BENTO GRID ---- */
+.bento{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+/* ---- GLASS CARD ---- */
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(40px);
+  -webkit-backdrop-filter:blur(40px);
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius);
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
+  position:relative;
+  overflow:hidden;
+}
+.glass::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent);
+}
+.glass:hover{
+  background:var(--glass-hover);
+  border-color:rgba(255,255,255,0.1);
+  box-shadow:0 8px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.05);
+  transform:translateY(-1px);
+}
+
+/* ---- MODEL CARDS ---- */
+.model-card{
+  padding:28px 20px 24px;
+  cursor:pointer;
+  text-align:center;
+}
+.model-card .icon{
+  font-size:2.4rem;
+  display:block;
+  margin-bottom:14px;
+  filter:grayscale(1) brightness(0.8);
+  transition:all 0.4s;
+}
+.model-card .name{
+  font-size:1.05rem;
+  font-weight:700;
+  color:var(--text-primary);
+  margin-bottom:4px;
+  letter-spacing:0.04em;
+}
+.model-card .desc{
+  font-size:0.65rem;
+  font-weight:300;
+  color:var(--text-secondary);
+  letter-spacing:0.08em;
+}
+.model-card .tag{
+  font-size:0.55rem;
+  font-weight:400;
+  color:var(--text-muted);
+  margin-top:12px;
+  font-family:'SF Mono','Fira Code',monospace;
+  letter-spacing:0.05em;
+}
+.model-card.active{
+  background:rgba(255,255,255,0.07);
+  border-color:rgba(255,255,255,0.15);
+  box-shadow:0 4px 30px rgba(0,0,0,0.3),0 0 60px rgba(255,255,255,0.02),inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.model-card.active .icon{
+  filter:grayscale(0) brightness(1);
+  transform:scale(1.08);
+}
+.model-card.active .name{color:#fff}
+.model-card.active::after{
+  content:'';
+  position:absolute;
+  bottom:0;left:20%;right:20%;
+  height:2px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);
+  border-radius:1px;
+}
+
+/* ---- SLIDER PANEL ---- */
+.slider-panel{
+  padding:24px;
+  margin-bottom:10px;
+}
+.slider-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin-bottom:16px;
+}
+.slider-row .label{
+  font-size:0.8rem;
+  font-weight:400;
+  color:var(--text-secondary);
+  letter-spacing:0.02em;
+}
+.slider-row .val{
+  font-size:1.6rem;
+  font-weight:800;
+  color:var(--text-primary);
+  font-variant-numeric:tabular-nums;
+  min-width:56px;
+  text-align:right;
+  line-height:1;
+}
+
+/* range */
+input[type=range]{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  height:2px;
+  background:rgba(255,255,255,0.08);
+  border-radius:1px;
+  outline:none;
+  margin:0;
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:22px;height:22px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 0 0 4px rgba(255,255,255,0.05),0 2px 12px rgba(0,0,0,0.6);
+  cursor:pointer;
+  transition:box-shadow 0.3s,transform 0.2s;
+}
+input[type=range]::-webkit-slider-thumb:hover{
+  box-shadow:0 0 0 6px rgba(255,255,255,0.08),0 2px 20px rgba(0,0,0,0.8);
+  transform:scale(1.1);
+}
+input[type=range]:active::-webkit-slider-thumb{
+  transform:scale(0.95);
+  box-shadow:0 0 0 8px rgba(255,255,255,0.1),0 2px 8px rgba(0,0,0,0.6);
+}
+/* firefox */
+input[type=range]::-moz-range-thumb{
+  width:22px;height:22px;border:none;
+  border-radius:50%;background:#fff;
+  box-shadow:0 0 0 4px rgba(255,255,255,0.05),0 2px 12px rgba(0,0,0,0.6);
+  cursor:pointer;
+}
+
+.slider-hints{
+  display:flex;
+  justify-content:space-between;
+  margin-top:10px;
+  font-size:0.55rem;
+  font-weight:300;
+  color:var(--text-muted);
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+}
+
+/* ---- SAVE BTN ---- */
+.save-btn{
+  width:100%;
+  padding:18px;
+  background:rgba(255,255,255,0.06);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius);
+  color:var(--text-primary);
+  font-family:inherit;
+  font-size:0.75rem;
+  font-weight:600;
+  letter-spacing:0.3em;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
+  position:relative;
+  overflow:hidden;
+  margin-top:8px;
+}
+.save-btn::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);
+}
+.save-btn:hover{
+  background:rgba(255,255,255,0.1);
+  border-color:rgba(255,255,255,0.16);
+  box-shadow:0 8px 40px rgba(0,0,0,0.4),0 0 60px rgba(255,255,255,0.02);
+  transform:translateY(-1px);
+}
+.save-btn:active{transform:scale(0.985);transition:transform 0.1s}
+.save-btn.saved{
+  background:rgba(255,255,255,0.12);
+  color:#fff;
+  box-shadow:0 0 40px rgba(255,255,255,0.04);
+}
+
+/* ---- STATUS ---- */
+.status{
+  text-align:center;
+  margin-top:20px;
+  font-size:0.6rem;
+  font-weight:300;
+  color:var(--text-muted);
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  min-height:18px;
+  transition:all 0.4s;
+}
+.status.ok{color:var(--success)}
+.status.err{color:rgba(255,80,80,0.7)}
+
+/* ---- PULSE DOT ---- */
+.pulse{
+  display:inline-block;
+  width:6px;height:6px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.3);
+  margin-right:6px;
+  vertical-align:middle;
+  animation:pulse-dot 3s ease-in-out infinite;
+}
+.pulse.live{background:rgba(120,255,120,0.5)}
+@keyframes pulse-dot{
+  0%,100%{opacity:0.4;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.3)}
+}
+
+/* ---- RESPONSIVE ---- */
+@media(max-width:380px){
+  .header h1{font-size:2.4rem;letter-spacing:0.15em}
+  .model-card{padding:20px 14px 18px}
+  .model-card .icon{font-size:2rem}
+  .slider-panel{padding:18px}
+}
 </style>
 </head>
 <body>
+
 <div class="container">
-  <div class="logo">
+
+  <div class="header">
     <h1>Pantera</h1>
-    <p>control panel</p>
+    <div class="sub"><span class="pulse live"></span>control</div>
   </div>
 
   <div class="section">
-    <div class="section-title">Мозг</div>
-    <div class="model-grid">
-      <div class="model-card" data-model="gemini-3-flash-preview" onclick="selectModel(this)">
-        <span class="model-icon">&#9889;</span>
-        <div class="model-name">Молния</div>
-        <div class="model-sub">быстрая, точная</div>
-        <div class="model-id">gemini-3-flash</div>
+    <div class="section-label">engine</div>
+    <div class="bento">
+      <div class="glass model-card" data-model="gemini-3-flash-preview" onclick="selectModel(this)">
+        <span class="icon">&#9889;</span>
+        <div class="name">Flash</div>
+        <div class="desc">fast &middot; precise</div>
+        <div class="tag">3-flash</div>
       </div>
-      <div class="model-card" data-model="gemini-3.1-pro-preview" onclick="selectModel(this)">
-        <span class="model-icon">&#128142;</span>
-        <div class="model-name">Хищница</div>
-        <div class="model-sub">мощная, глубокая</div>
-        <div class="model-id">gemini-3.1-pro</div>
+      <div class="glass model-card" data-model="gemini-3.1-pro-preview" onclick="selectModel(this)">
+        <span class="icon">&#9670;</span>
+        <div class="name">Pro</div>
+        <div class="desc">deep &middot; powerful</div>
+        <div class="tag">3.1-pro</div>
       </div>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">Настройки</div>
-    <div class="slider-box">
-      <div class="slider-header">
-        <span class="slider-label">Температура</span>
-        <span class="slider-value" id="tempVal">0.7</span>
+    <div class="section-label">parameters</div>
+
+    <div class="glass slider-panel">
+      <div class="slider-row">
+        <span class="label">Temperature</span>
+        <span class="val" id="tempVal">0.7</span>
       </div>
       <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7"
              oninput="document.getElementById('tempVal').textContent=parseFloat(this.value).toFixed(1)">
       <div class="slider-hints">
-        <span>точная</span>
-        <span>креативная</span>
+        <span>precise</span>
+        <span>creative</span>
       </div>
     </div>
-    <div class="slider-box">
-      <div class="slider-header">
-        <span class="slider-label">Глубина мышления</span>
-        <span class="slider-value" id="thinkVal">1024</span>
+
+    <div class="glass slider-panel">
+      <div class="slider-row">
+        <span class="label">Thinking depth</span>
+        <span class="val" id="thinkVal">1024</span>
       </div>
       <input type="range" id="thinkSlider" min="0" max="8192" step="128" value="1024"
              oninput="document.getElementById('thinkVal').textContent=this.value">
       <div class="slider-hints">
-        <span>мгновенно</span>
-        <span>глубоко</span>
+        <span>instant</span>
+        <span>deep</span>
       </div>
     </div>
   </div>
 
-  <button class="save-btn" id="saveBtn" onclick="saveConfig()">Сохранить</button>
-  <div class="status-bar" id="status"></div>
+  <button class="save-btn" id="saveBtn" onclick="saveConfig()">apply</button>
+  <div class="status" id="status"></div>
+
 </div>
 
 <script>
-let selectedModel = 'gemini-3-flash-preview';
+let selectedModel='gemini-3-flash-preview';
 
-function selectModel(el) {
-  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('active'));
+function selectModel(el){
+  document.querySelectorAll('.model-card').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
-  selectedModel = el.dataset.model;
+  selectedModel=el.dataset.model;
 }
 
-async function saveConfig() {
-  const btn = document.getElementById('saveBtn');
-  const status = document.getElementById('status');
-  btn.textContent = '...';
-  try {
-    const resp = await fetch('/pantera/save', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model: selectedModel,
-        temperature: parseFloat(document.getElementById('tempSlider').value),
-        thinking_budget: parseInt(document.getElementById('thinkSlider').value)
+async function saveConfig(){
+  const btn=document.getElementById('saveBtn');
+  const status=document.getElementById('status');
+  btn.textContent='...';
+  try{
+    const resp=await fetch('/pantera/save',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:selectedModel,
+        temperature:parseFloat(document.getElementById('tempSlider').value),
+        thinking_budget:parseInt(document.getElementById('thinkSlider').value)
       })
     });
-    const data = await resp.json();
-    if (data.ok) {
-      btn.textContent = 'Сохранено';
+    const data=await resp.json();
+    if(data.ok){
+      btn.textContent='applied';
       btn.classList.add('saved');
-      status.textContent = 'настройки применены';
-      status.className = 'status-bar ok';
-      setTimeout(() => {
-        btn.textContent = 'Сохранить';
-        btn.classList.remove('saved');
-      }, 2000);
-    } else {
-      throw new Error('save failed');
-    }
-  } catch(e) {
-    btn.textContent = 'Ошибка';
-    status.textContent = 'не удалось сохранить';
-    status.className = 'status-bar err';
-    setTimeout(() => { btn.textContent = 'Сохранить'; }, 2000);
+      status.textContent='settings saved';
+      status.className='status ok';
+      setTimeout(()=>{btn.textContent='apply';btn.classList.remove('saved')},2500);
+    }else{throw new Error('fail')}
+  }catch(e){
+    btn.textContent='error';
+    status.textContent='failed to save';
+    status.className='status err';
+    setTimeout(()=>{btn.textContent='apply'},2500);
   }
 }
 
-// Load current config
-fetch('/pantera/config').then(r=>r.json()).then(cfg => {
-  selectedModel = cfg.model || 'gemini-3-flash-preview';
-  document.querySelectorAll('.model-card').forEach(c => {
-    if (c.dataset.model === selectedModel) c.classList.add('active');
+fetch('/pantera/config').then(r=>r.json()).then(cfg=>{
+  selectedModel=cfg.model||'gemini-3-flash-preview';
+  document.querySelectorAll('.model-card').forEach(c=>{
+    if(c.dataset.model===selectedModel) c.classList.add('active');
   });
-  document.getElementById('tempSlider').value = cfg.temperature || 0.7;
-  document.getElementById('tempVal').textContent = parseFloat(cfg.temperature || 0.7).toFixed(1);
-  document.getElementById('thinkSlider').value = cfg.thinking_budget || 1024;
-  document.getElementById('thinkVal').textContent = cfg.thinking_budget || 1024;
+  document.getElementById('tempSlider').value=cfg.temperature||0.7;
+  document.getElementById('tempVal').textContent=parseFloat(cfg.temperature||0.7).toFixed(1);
+  document.getElementById('thinkSlider').value=cfg.thinking_budget||1024;
+  document.getElementById('thinkVal').textContent=cfg.thinking_budget||1024;
 });
 </script>
 </body>
