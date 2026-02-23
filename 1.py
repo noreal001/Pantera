@@ -472,10 +472,11 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .modal .step{margin-bottom:20px}
 .modal .step-num{font-size:.55rem;font-weight:600;letter-spacing:.3em;color:var(--text-muted);
   text-transform:uppercase;margin-bottom:8px}
-.modal a.channel-btn{display:block;padding:14px;background:rgba(255,255,255,.06);
+.modal .channel-btn{display:block;width:100%;padding:14px;background:rgba(255,255,255,.06);
   border:1px solid rgba(255,255,255,.08);border-radius:14px;color:var(--text-primary);
-  text-decoration:none;font-size:.8rem;font-weight:500;letter-spacing:.05em;transition:all .3s}
-.modal a.channel-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
+  text-decoration:none;font-size:.8rem;font-weight:500;letter-spacing:.05em;transition:all .3s;
+  cursor:pointer;font-family:inherit;text-align:center}
+.modal .channel-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
 .modal input{width:100%;padding:14px;background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.08);border-radius:14px;color:#fff;font-family:inherit;
   font-size:1rem;text-align:center;letter-spacing:.15em;outline:none;transition:border-color .3s}
@@ -589,7 +590,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
         <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 16 16" fill="none" stroke="rgba(120,255,120,.6)" stroke-width="1.5" stroke-linecap="round"><path d="M2 8.5L6 12.5L14 3.5"/></svg>
         <span id="phoneDisplay"></span>
       </div>
-      <button class="channel-btn" id="sharePhoneBtn" onclick="requestPhone()" style="cursor:pointer;border:none;font-family:inherit">
+      <button class="channel-btn" id="sharePhoneBtn" onclick="requestPhone()">
         <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
         Поделиться номером
       </button>
