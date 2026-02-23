@@ -350,9 +350,9 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 }
 html{font-size:16px;position:fixed;width:100%;height:100%;overflow:hidden}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text-primary);
-  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-  padding:20px;overflow:hidden;-webkit-font-smoothing:antialiased;
-  position:fixed;touch-action:manipulation;overscroll-behavior:none;-webkit-overflow-scrolling:none}
+  width:100%;height:100%;display:flex;align-items:flex-start;justify-content:center;
+  padding:12px 20px;overflow-y:auto;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+  position:fixed;touch-action:pan-y;overscroll-behavior:none}
 body::before{content:'';position:fixed;top:-40%;left:-20%;width:140%;height:140%;
   background:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,0.015) 0%,transparent 60%),
   radial-gradient(ellipse at 70% 80%,rgba(255,255,255,0.01) 0%,transparent 50%);
@@ -361,16 +361,16 @@ body::before{content:'';position:fixed;top:-40%;left:-20%;width:140%;height:140%
 .container{width:100%;max-width:440px;position:relative;z-index:1}
 
 /* header */
-.header{text-align:center;margin-bottom:44px;padding-top:12px}
-.header h1{font-size:3.2rem;font-weight:800;letter-spacing:.25em;text-transform:uppercase;
-  color:var(--text-primary);line-height:1;margin-bottom:8px;text-shadow:0 0 80px rgba(255,255,255,.08)}
-.header .sub{font-size:.65rem;font-weight:300;letter-spacing:.5em;text-transform:uppercase;color:var(--text-muted)}
+.header{text-align:center;margin-bottom:20px;padding-top:4px}
+.header h1{font-size:2.2rem;font-weight:800;letter-spacing:.25em;text-transform:uppercase;
+  color:var(--text-primary);line-height:1;margin-bottom:6px;text-shadow:0 0 80px rgba(255,255,255,.08)}
+.header .sub{font-size:.6rem;font-weight:300;letter-spacing:.5em;text-transform:uppercase;color:var(--text-muted)}
 .pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(120,255,120,.5);
   margin-right:6px;vertical-align:middle;animation:pulse-dot 3s ease-in-out infinite}
 @keyframes pulse-dot{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
 
 /* section */
-.section{margin-bottom:20px}
+.section{margin-bottom:14px}
 .section-label{font-size:.6rem;font-weight:600;letter-spacing:.3em;text-transform:uppercase;
   color:var(--text-muted);margin-bottom:12px;padding-left:4px}
 .bento{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -385,7 +385,7 @@ body::before{content:'';position:fixed;top:-40%;left:-20%;width:140%;height:140%
   box-shadow:0 8px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);transform:translateY(-1px)}
 
 /* model cards */
-.model-card{padding:28px 20px 24px;cursor:pointer;text-align:center}
+.model-card{padding:20px 16px 18px;cursor:pointer;text-align:center}
 .model-card .icon-wrap{width:48px;height:48px;margin:0 auto 14px;opacity:.5;transition:all .4s}
 .model-card .icon-wrap svg{width:100%;height:100%}
 .model-card .name{font-size:1.05rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;letter-spacing:.04em}
@@ -405,7 +405,7 @@ body::before{content:'';position:fixed;top:-40%;left:-20%;width:140%;height:140%
 .model-card.unlocked .lock-badge{display:none}
 
 /* slider */
-.slider-panel{padding:24px;margin-bottom:10px}
+.slider-panel{padding:18px;margin-bottom:8px}
 .slider-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
 .slider-row .label{font-size:.8rem;font-weight:400;color:var(--text-secondary);letter-spacing:.02em}
 .slider-row .val{font-size:1.6rem;font-weight:800;color:var(--text-primary);
@@ -422,7 +422,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
   font-weight:300;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase}
 
 /* save btn */
-.save-btn{width:100%;padding:18px;background:rgba(255,255,255,.06);backdrop-filter:blur(20px);
+.save-btn{width:100%;padding:14px;background:rgba(255,255,255,.06);backdrop-filter:blur(20px);
   -webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius);
   color:var(--text-primary);font-family:inherit;font-size:.75rem;font-weight:600;letter-spacing:.3em;
   text-transform:uppercase;cursor:pointer;transition:all .4s cubic-bezier(.16,1,.3,1);position:relative;
