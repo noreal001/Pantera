@@ -22,7 +22,7 @@ TOKEN = os.getenv('TOKEN')
 BASE_WEBHOOK_URL = os.getenv('WEBHOOK_BASE_URL')
 WEBHOOK_PATH = "/webhook/ai-bear-123456"
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-preview-05-20')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.1-pro-preview')
 
 # --- FastAPI app ---
 app = FastAPI()
