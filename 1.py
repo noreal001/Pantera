@@ -157,24 +157,33 @@ async def telegram_send_message(chat_id, text, reply_markup=None):
 
 # --- Supabase ---
 async def supabase_get_user(chat_id):
+    if not SUPABASE_KEY:
+        logger.warning("SUPABASE_KEY not set, skipping user check")
+        return None
     try:
         url = f"{SUPABASE_URL}/rest/v1/pantera?chat_id=eq.{chat_id}&select=*"
-        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
             resp = await client.get(url, headers={
                 "apikey": SUPABASE_KEY,
                 "Authorization": f"Bearer {SUPABASE_KEY}"
             })
+            logger.info(f"Supabase get user {chat_id}: status={resp.status_code}")
             if resp.status_code == 200:
                 data = resp.json()
                 return data[0] if data else None
+            else:
+                logger.error(f"Supabase get error: {resp.status_code} - {resp.text}")
     except Exception as e:
         logger.error(f"Supabase get error: {e}")
     return None
 
 async def supabase_save_user(chat_id, phone, first_name="", username=""):
+    if not SUPABASE_KEY:
+        logger.warning("SUPABASE_KEY not set, skipping user save")
+        return False
     try:
         url = f"{SUPABASE_URL}/rest/v1/pantera"
-        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
             resp = await client.post(url, json={
                 "chat_id": chat_id,
                 "phone": phone,
@@ -186,6 +195,7 @@ async def supabase_save_user(chat_id, phone, first_name="", username=""):
                 "Content-Type": "application/json",
                 "Prefer": "return=minimal"
             })
+            logger.info(f"Supabase save user {chat_id}: status={resp.status_code}")
             if resp.status_code in (200, 201):
                 logger.info(f"User saved: chat_id={chat_id}, phone={phone}")
                 return True
@@ -451,7 +461,7 @@ async def describe_photo_vision(image_base64, mime_type="image/jpeg"):
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(update: dict, request: Request):
     try:
-        logger.info(f"Webhook received update: {list(update.keys())}")
+        logger.info(f"Webhook update: {json.dumps(update, ensure_ascii=False, default=str)[:500]}")
         if "message" in update:
             message = update["message"]
             chat_id = message["chat"]["id"]
@@ -461,11 +471,14 @@ async def telegram_webhook(update: dict, request: Request):
             photo = message.get("photo")
             contact = message.get("contact")
 
+            logger.info(f"chat_id={chat_id} text={text[:50] if text else ''} voice={bool(voice)} photo={bool(photo)} contact={bool(contact)}")
+
             # Обработка контакта — сохраняем номер
             if contact:
                 phone = contact.get("phone_number", "")
                 first_name = contact.get("first_name", "")
                 username = message.get("from", {}).get("username", "")
+                logger.info(f"Contact received: chat_id={chat_id}, phone={phone}")
                 saved = await supabase_save_user(chat_id, phone, first_name, username)
                 if saved:
                     await telegram_send_message(
@@ -474,21 +487,24 @@ async def telegram_webhook(update: dict, request: Request):
                         reply_markup={"remove_keyboard": True}
                     )
                 else:
-                    await telegram_send_message(chat_id, "Произошла ошибка, попробуйте ещё раз.")
+                    await telegram_send_message(chat_id, "Произошла ошибка при сохранении. Попробуйте ещё раз.")
                 return {"ok": True}
 
-            # Проверяем регистрацию пользователя
-            user = await supabase_get_user(chat_id)
+            # Проверяем регистрацию — если Supabase настроен
+            user = None
+            if SUPABASE_KEY:
+                user = await supabase_get_user(chat_id)
+                logger.info(f"User lookup: chat_id={chat_id}, found={bool(user)}")
 
             if text == "/start":
-                if user:
+                if user or not SUPABASE_KEY:
                     await telegram_send_message(chat_id, "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос.")
                 else:
                     await request_phone(chat_id)
                 return {"ok": True}
 
-            # Если номер не сохранён — просим
-            if not user:
+            # Если Supabase настроен и номер не сохранён — просим
+            if SUPABASE_KEY and not user:
                 await request_phone(chat_id)
                 return {"ok": True}
 
@@ -505,6 +521,8 @@ async def telegram_webhook(update: dict, request: Request):
                 ai_answer = await ask_gemini(text, user_id)
                 if ai_answer:
                     await telegram_send_message(chat_id, ai_answer)
+                else:
+                    logger.error(f"Gemini returned None for chat_id={chat_id}")
                 return {"ok": True}
         return {"ok": True}
     except Exception as e:
@@ -1032,6 +1050,11 @@ async def set_telegram_webhook(base_url: str):
 @app.on_event("startup")
 async def startup_event():
     logger.info("=== STARTUP ===")
+    logger.info(f"TOKEN set: {bool(TOKEN)}")
+    logger.info(f"GEMINI_API_KEY set: {bool(GEMINI_API_KEY)}")
+    logger.info(f"OPENAI_API_KEY set: {bool(OPENAI_API_KEY)}")
+    logger.info(f"SUPABASE_URL: {SUPABASE_URL}")
+    logger.info(f"SUPABASE_KEY set: {bool(SUPABASE_KEY)}")
     base_url = os.getenv("WEBHOOK_BASE_URL")
     if base_url:
         try:
