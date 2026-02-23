@@ -7,6 +7,7 @@ import httpx
 import sys
 import uvicorn
 import json
+import base64
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse, JSONResponse, HTMLResponse
 from pydantic import BaseModel
@@ -20,6 +21,7 @@ TOKEN = os.getenv('TOKEN')
 BASE_WEBHOOK_URL = os.getenv('WEBHOOK_BASE_URL')
 WEBHOOK_PATH = "/webhook/ai-bear-123456"
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 CONFIG_FILE = "bot_config.json"
 DEFAULT_CONFIG = {
@@ -274,29 +276,123 @@ async def process_voice(voice, chat_id, user_id):
 
 async def recognize_voice_content(file_content):
     try:
-        import speech_recognition as sr
-        from pydub import AudioSegment
-        import tempfile
-        recognizer = sr.Recognizer()
-        with tempfile.NamedTemporaryFile(suffix='.ogg') as temp_ogg, tempfile.NamedTemporaryFile(suffix='.wav') as temp_wav:
-            temp_ogg.write(file_content)
-            temp_ogg.flush()
-            try:
-                audio = AudioSegment.from_file(temp_ogg.name)
-                audio.export(temp_wav.name, format='wav')
-            except Exception:
-                return "Ошибка при обработке аудио файла."
-            try:
-                with sr.AudioFile(temp_wav.name) as source:
-                    audio_data = recognizer.record(source)
-                return recognizer.recognize_google(audio_data, language='ru-RU')
-            except sr.UnknownValueError:
-                return "Не удалось разобрать речь."
-            except sr.RequestError:
-                return "Ошибка сервиса распознавания речи."
+        timeout = aiohttp.ClientTimeout(total=30)
+        form = aiohttp.FormData()
+        form.add_field("file", file_content, filename="voice.ogg", content_type="audio/ogg")
+        form.add_field("model", "whisper-1")
+        form.add_field("language", "ru")
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                "https://api.openai.com/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                data=form
+            ) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    logger.error(f"Whisper API error: {resp.status} - {error_text}")
+                    return "Ошибка сервиса распознавания речи."
+                result = await resp.json()
+                text = result.get("text", "").strip()
+                if not text:
+                    return "Не удалось разобрать речь."
+                return text
+    except asyncio.TimeoutError:
+        logger.error("Whisper API timeout")
+        return "Ошибка сервиса распознавания речи."
     except Exception as e:
-        logger.error(f"Speech recognition error: {e}")
+        logger.error(f"Whisper API error: {e}")
         return "Ошибка при обработке голосового сообщения."
+
+
+# --- Обработка фото через GPT-5.2 Vision ---
+async def process_photo(photo, message, chat_id, user_id):
+    try:
+        file_id = photo[-1]["file_id"]
+        caption = message.get("caption", "").strip()
+
+        file_url = f"https://api.telegram.org/bot{TOKEN}/getFile?file_id={file_id}"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            resp = await client.get(file_url)
+            if resp.status_code != 200:
+                return
+            file_info = resp.json()
+            if not file_info.get("ok"):
+                return
+            file_path = file_info["result"]["file_path"]
+            download_url = f"https://api.telegram.org/file/bot{TOKEN}/{file_path}"
+            resp = await client.get(download_url)
+            if resp.status_code != 200:
+                return
+            image_data = base64.b64encode(resp.content).decode("utf-8")
+
+        ext = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else "jpg"
+        mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp"}
+        mime_type = mime_map.get(ext, "image/jpeg")
+
+        description = await describe_photo_vision(image_data, mime_type)
+        if not description:
+            await telegram_send_message(chat_id, "Не удалось распознать фото.")
+            return
+
+        if caption:
+            prompt = f"Клиент отправил фото с подписью: \"{caption}\"\nОписание фото: {description}\nОтветь клиенту в своём образе."
+        else:
+            prompt = f"Клиент отправил фото.\nОписание фото: {description}\nОтветь клиенту в своём образе."
+
+        ai_answer = await ask_gemini(prompt, user_id)
+        if ai_answer:
+            await telegram_send_message(chat_id, ai_answer)
+    except Exception as e:
+        logger.error(f"Photo processing error: {e}\n{traceback.format_exc()}")
+
+
+async def describe_photo_vision(image_base64, mime_type="image/jpeg"):
+    try:
+        timeout = aiohttp.ClientTimeout(total=60)
+        data = {
+            "model": "gpt-5.2",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Опиши что на фото кратко на русском."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 500
+        }
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json=data
+            ) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    logger.error(f"GPT Vision API error: {resp.status} - {error_text}")
+                    return None
+                result = await resp.json()
+                return result["choices"][0]["message"]["content"].strip()
+    except asyncio.TimeoutError:
+        logger.error("GPT Vision API timeout")
+        return None
+    except Exception as e:
+        logger.error(f"GPT Vision API error: {e}\n{traceback.format_exc()}")
+        return None
 
 
 # --- Webhook ---
@@ -310,9 +406,14 @@ async def telegram_webhook(update: dict, request: Request):
             user_id = message["from"]["id"]
             text = message.get("text", "").strip()
             voice = message.get("voice")
+            photo = message.get("photo")
             if voice:
                 await send_typing_action(chat_id)
                 await process_voice(voice, chat_id, user_id)
+                return {"ok": True}
+            if photo:
+                await send_typing_action(chat_id)
+                await process_photo(photo, message, chat_id, user_id)
                 return {"ok": True}
             if text == "/start":
                 welcome = "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос."
