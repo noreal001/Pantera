@@ -332,7 +332,7 @@ async def telegram_webhook(update: dict, request: Request):
 # ===================================================================
 # ADMIN PANEL
 # ===================================================================
-ADMIN_HTML = """<!DOCTYPE html>
+ADMIN_HTML = r"""<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -340,404 +340,256 @@ ADMIN_HTML = """<!DOCTYPE html>
 <title>PANTERA</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&display=swap');
-
 *{margin:0;padding:0;box-sizing:border-box}
-
 :root{
-  --bg:#050505;
-  --surface:rgba(255,255,255,0.03);
-  --glass:rgba(255,255,255,0.04);
-  --glass-border:rgba(255,255,255,0.06);
-  --glass-hover:rgba(255,255,255,0.08);
-  --text-primary:rgba(255,255,255,0.92);
-  --text-secondary:rgba(255,255,255,0.4);
-  --text-muted:rgba(255,255,255,0.18);
-  --accent:rgba(255,255,255,0.9);
-  --glow:rgba(255,255,255,0.06);
-  --success:rgba(255,255,255,0.7);
-  --radius:20px;
+  --bg:#050505;--glass:rgba(255,255,255,0.04);--glass-border:rgba(255,255,255,0.06);
+  --glass-hover:rgba(255,255,255,0.08);--text-primary:rgba(255,255,255,0.92);
+  --text-secondary:rgba(255,255,255,0.4);--text-muted:rgba(255,255,255,0.18);--radius:20px;
 }
-
 html{font-size:16px}
-
-body{
-  font-family:'Inter',system-ui,-apple-system,sans-serif;
-  background:var(--bg);
-  color:var(--text-primary);
-  min-height:100vh;
-  min-height:100dvh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  overflow-x:hidden;
-  -webkit-font-smoothing:antialiased;
-}
-
-/* ambient glow */
-body::before{
-  content:'';
-  position:fixed;
-  top:-40%;left:-20%;
-  width:140%;height:140%;
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text-primary);
+  min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;
+  padding:20px;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;top:-40%;left:-20%;width:140%;height:140%;
   background:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,0.015) 0%,transparent 60%),
-             radial-gradient(ellipse at 70% 80%,rgba(255,255,255,0.01) 0%,transparent 50%);
-  pointer-events:none;
-  animation:breathe 12s ease-in-out infinite alternate;
-}
-@keyframes breathe{
-  0%{opacity:0.6;transform:scale(1)}
-  100%{opacity:1;transform:scale(1.05)}
-}
+  radial-gradient(ellipse at 70% 80%,rgba(255,255,255,0.01) 0%,transparent 50%);
+  pointer-events:none;animation:breathe 12s ease-in-out infinite alternate}
+@keyframes breathe{0%{opacity:.6;transform:scale(1)}100%{opacity:1;transform:scale(1.05)}}
+.container{width:100%;max-width:440px;position:relative;z-index:1}
 
-.container{
-  width:100%;
-  max-width:440px;
-  position:relative;
-  z-index:1;
-}
+/* header */
+.header{text-align:center;margin-bottom:44px;padding-top:12px}
+.header h1{font-size:3.2rem;font-weight:800;letter-spacing:.25em;text-transform:uppercase;
+  color:var(--text-primary);line-height:1;margin-bottom:8px;text-shadow:0 0 80px rgba(255,255,255,.08)}
+.header .sub{font-size:.65rem;font-weight:300;letter-spacing:.5em;text-transform:uppercase;color:var(--text-muted)}
+.pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(120,255,120,.5);
+  margin-right:6px;vertical-align:middle;animation:pulse-dot 3s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
 
-/* ---- HEADER ---- */
-.header{
-  text-align:center;
-  margin-bottom:48px;
-  padding-top:12px;
-}
-.header h1{
-  font-size:3.2rem;
-  font-weight:800;
-  letter-spacing:0.25em;
-  text-transform:uppercase;
-  color:var(--text-primary);
-  line-height:1;
-  margin-bottom:8px;
-  text-shadow:0 0 80px rgba(255,255,255,0.08);
-}
-.header .sub{
-  font-size:0.65rem;
-  font-weight:300;
-  letter-spacing:0.5em;
-  text-transform:uppercase;
-  color:var(--text-muted);
-}
-
-/* ---- SECTION ---- */
+/* section */
 .section{margin-bottom:20px}
-.section-label{
-  font-size:0.6rem;
-  font-weight:600;
-  letter-spacing:0.3em;
-  text-transform:uppercase;
-  color:var(--text-muted);
-  margin-bottom:12px;
-  padding-left:4px;
-}
+.section-label{font-size:.6rem;font-weight:600;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:12px;padding-left:4px}
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
-/* ---- BENTO GRID ---- */
-.bento{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
+/* glass */
+.glass{background:var(--glass);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);
+  border:1px solid var(--glass-border);border-radius:var(--radius);
+  transition:all .4s cubic-bezier(.16,1,.3,1);position:relative;overflow:hidden}
+.glass::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent)}
+.glass:hover{background:var(--glass-hover);border-color:rgba(255,255,255,.1);
+  box-shadow:0 8px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);transform:translateY(-1px)}
 
-/* ---- GLASS CARD ---- */
-.glass{
-  background:var(--glass);
-  backdrop-filter:blur(40px);
-  -webkit-backdrop-filter:blur(40px);
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius);
-  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
-  position:relative;
-  overflow:hidden;
-}
-.glass::before{
-  content:'';
-  position:absolute;
-  top:0;left:0;right:0;
-  height:1px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent);
-}
-.glass:hover{
-  background:var(--glass-hover);
-  border-color:rgba(255,255,255,0.1);
-  box-shadow:0 8px 40px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.05);
-  transform:translateY(-1px);
-}
-
-/* ---- MODEL CARDS ---- */
-.model-card{
-  padding:28px 20px 24px;
-  cursor:pointer;
-  text-align:center;
-}
-.model-card .icon{
-  font-size:2.4rem;
-  display:block;
-  margin-bottom:14px;
-  filter:grayscale(1) brightness(0.8);
-  transition:all 0.4s;
-}
-.model-card .name{
-  font-size:1.05rem;
-  font-weight:700;
-  color:var(--text-primary);
-  margin-bottom:4px;
-  letter-spacing:0.04em;
-}
-.model-card .desc{
-  font-size:0.65rem;
-  font-weight:300;
-  color:var(--text-secondary);
-  letter-spacing:0.08em;
-}
-.model-card .tag{
-  font-size:0.55rem;
-  font-weight:400;
-  color:var(--text-muted);
-  margin-top:12px;
-  font-family:'SF Mono','Fira Code',monospace;
-  letter-spacing:0.05em;
-}
-.model-card.active{
-  background:rgba(255,255,255,0.07);
-  border-color:rgba(255,255,255,0.15);
-  box-shadow:0 4px 30px rgba(0,0,0,0.3),0 0 60px rgba(255,255,255,0.02),inset 0 1px 0 rgba(255,255,255,0.1);
-}
-.model-card.active .icon{
-  filter:grayscale(0) brightness(1);
-  transform:scale(1.08);
-}
+/* model cards */
+.model-card{padding:28px 20px 24px;cursor:pointer;text-align:center}
+.model-card .icon-wrap{width:48px;height:48px;margin:0 auto 14px;opacity:.5;transition:all .4s}
+.model-card .icon-wrap svg{width:100%;height:100%}
+.model-card .name{font-size:1.05rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;letter-spacing:.04em}
+.model-card .desc{font-size:.65rem;font-weight:300;color:var(--text-secondary);letter-spacing:.08em}
+.model-card .tag{font-size:.55rem;font-weight:400;color:var(--text-muted);margin-top:12px;
+  font-family:'SF Mono','Fira Code',monospace;letter-spacing:.05em}
+.model-card.active{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.15);
+  box-shadow:0 4px 30px rgba(0,0,0,.3),0 0 60px rgba(255,255,255,.02),inset 0 1px 0 rgba(255,255,255,.1)}
+.model-card.active .icon-wrap{opacity:1;transform:scale(1.08)}
 .model-card.active .name{color:#fff}
-.model-card.active::after{
-  content:'';
-  position:absolute;
-  bottom:0;left:20%;right:20%;
-  height:2px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);
-  border-radius:1px;
-}
+.model-card.active::after{content:'';position:absolute;bottom:0;left:20%;right:20%;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);border-radius:1px}
 
-/* ---- SLIDER PANEL ---- */
-.slider-panel{
-  padding:24px;
-  margin-bottom:10px;
-}
-.slider-row{
-  display:flex;
-  justify-content:space-between;
-  align-items:baseline;
-  margin-bottom:16px;
-}
-.slider-row .label{
-  font-size:0.8rem;
-  font-weight:400;
-  color:var(--text-secondary);
-  letter-spacing:0.02em;
-}
-.slider-row .val{
-  font-size:1.6rem;
-  font-weight:800;
-  color:var(--text-primary);
-  font-variant-numeric:tabular-nums;
-  min-width:56px;
-  text-align:right;
-  line-height:1;
-}
+/* lock badge */
+.lock-badge{position:absolute;top:10px;right:10px;width:18px;height:18px;opacity:.3}
+.lock-badge svg{width:100%;height:100%}
+.model-card.unlocked .lock-badge{display:none}
 
-/* range */
-input[type=range]{
-  -webkit-appearance:none;
-  appearance:none;
-  width:100%;
-  height:2px;
-  background:rgba(255,255,255,0.08);
-  border-radius:1px;
-  outline:none;
-  margin:0;
-  cursor:pointer;
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;
-  width:22px;height:22px;
-  border-radius:50%;
-  background:#fff;
-  box-shadow:0 0 0 4px rgba(255,255,255,0.05),0 2px 12px rgba(0,0,0,0.6);
-  cursor:pointer;
-  transition:box-shadow 0.3s,transform 0.2s;
-}
-input[type=range]::-webkit-slider-thumb:hover{
-  box-shadow:0 0 0 6px rgba(255,255,255,0.08),0 2px 20px rgba(0,0,0,0.8);
-  transform:scale(1.1);
-}
-input[type=range]:active::-webkit-slider-thumb{
-  transform:scale(0.95);
-  box-shadow:0 0 0 8px rgba(255,255,255,0.1),0 2px 8px rgba(0,0,0,0.6);
-}
-/* firefox */
-input[type=range]::-moz-range-thumb{
-  width:22px;height:22px;border:none;
-  border-radius:50%;background:#fff;
-  box-shadow:0 0 0 4px rgba(255,255,255,0.05),0 2px 12px rgba(0,0,0,0.6);
-  cursor:pointer;
-}
+/* slider */
+.slider-panel{padding:24px;margin-bottom:10px}
+.slider-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
+.slider-row .label{font-size:.8rem;font-weight:400;color:var(--text-secondary);letter-spacing:.02em}
+.slider-row .val{font-size:1.6rem;font-weight:800;color:var(--text-primary);
+  font-variant-numeric:tabular-nums;min-width:56px;text-align:right;line-height:1}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:2px;
+  background:rgba(255,255,255,.08);border-radius:1px;outline:none;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+  background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.05),0 2px 12px rgba(0,0,0,.6);
+  cursor:pointer;transition:box-shadow .3s,transform .2s}
+input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 6px rgba(255,255,255,.08),0 2px 20px rgba(0,0,0,.8);transform:scale(1.1)}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 4px rgba(255,255,255,.05),0 2px 12px rgba(0,0,0,.6);cursor:pointer}
+.slider-hints{display:flex;justify-content:space-between;margin-top:10px;font-size:.55rem;
+  font-weight:300;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase}
 
-.slider-hints{
-  display:flex;
-  justify-content:space-between;
-  margin-top:10px;
-  font-size:0.55rem;
-  font-weight:300;
-  color:var(--text-muted);
-  letter-spacing:0.1em;
-  text-transform:uppercase;
-}
+/* save btn */
+.save-btn{width:100%;padding:18px;background:rgba(255,255,255,.06);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius);
+  color:var(--text-primary);font-family:inherit;font-size:.75rem;font-weight:600;letter-spacing:.3em;
+  text-transform:uppercase;cursor:pointer;transition:all .4s cubic-bezier(.16,1,.3,1);position:relative;
+  overflow:hidden;margin-top:8px}
+.save-btn::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)}
+.save-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.16);
+  box-shadow:0 8px 40px rgba(0,0,0,.4);transform:translateY(-1px)}
+.save-btn:active{transform:scale(.985);transition:transform .1s}
+.save-btn.saved{background:rgba(255,255,255,.12);color:#fff}
+.status{text-align:center;margin-top:20px;font-size:.6rem;font-weight:300;color:var(--text-muted);
+  letter-spacing:.2em;text-transform:uppercase;min-height:18px;transition:all .4s}
+.status.ok{color:rgba(255,255,255,.7)} .status.err{color:rgba(255,80,80,.7)}
 
-/* ---- SAVE BTN ---- */
-.save-btn{
-  width:100%;
-  padding:18px;
-  background:rgba(255,255,255,0.06);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
-  border:1px solid rgba(255,255,255,0.1);
-  border-radius:var(--radius);
-  color:var(--text-primary);
-  font-family:inherit;
-  font-size:0.75rem;
-  font-weight:600;
-  letter-spacing:0.3em;
-  text-transform:uppercase;
-  cursor:pointer;
-  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
-  position:relative;
-  overflow:hidden;
-  margin-top:8px;
-}
-.save-btn::before{
-  content:'';
-  position:absolute;
-  top:0;left:0;right:0;
-  height:1px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);
-}
-.save-btn:hover{
-  background:rgba(255,255,255,0.1);
-  border-color:rgba(255,255,255,0.16);
-  box-shadow:0 8px 40px rgba(0,0,0,0.4),0 0 60px rgba(255,255,255,0.02);
-  transform:translateY(-1px);
-}
-.save-btn:active{transform:scale(0.985);transition:transform 0.1s}
-.save-btn.saved{
-  background:rgba(255,255,255,0.12);
-  color:#fff;
-  box-shadow:0 0 40px rgba(255,255,255,0.04);
-}
+/* ---- MODAL ---- */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);z-index:100;display:none;align-items:center;
+  justify-content:center;padding:20px;animation:fadeIn .3s}
+.overlay.show{display:flex}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:24px;
+  padding:36px 28px;max-width:380px;width:100%;text-align:center;position:relative;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);animation:slideUp .4s cubic-bezier(.16,1,.3,1)}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+.modal-close{position:absolute;top:14px;right:14px;width:28px;height:28px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);border-radius:50%;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;transition:all .3s}
+.modal-close:hover{background:rgba(255,255,255,.12)}
+.modal-close svg{width:12px;height:12px}
+.modal h2{font-size:1.3rem;font-weight:700;margin-bottom:6px;color:var(--text-primary)}
+.modal p{font-size:.75rem;font-weight:300;color:var(--text-secondary);margin-bottom:24px;line-height:1.5}
+.modal .step{margin-bottom:20px}
+.modal .step-num{font-size:.55rem;font-weight:600;letter-spacing:.3em;color:var(--text-muted);
+  text-transform:uppercase;margin-bottom:8px}
+.modal a.channel-btn{display:block;padding:14px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);border-radius:14px;color:var(--text-primary);
+  text-decoration:none;font-size:.8rem;font-weight:500;letter-spacing:.05em;transition:all .3s}
+.modal a.channel-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.14)}
+.modal input{width:100%;padding:14px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);border-radius:14px;color:#fff;font-family:inherit;
+  font-size:1rem;text-align:center;letter-spacing:.15em;outline:none;transition:border-color .3s}
+.modal input::placeholder{color:rgba(255,255,255,.15);letter-spacing:.1em}
+.modal input:focus{border-color:rgba(255,255,255,.2)}
+.modal .phone-input{font-size:.85rem;letter-spacing:.08em;margin-bottom:10px}
+.modal .code-input{font-size:1.4rem;font-weight:700;letter-spacing:.3em}
+.modal .unlock-btn{width:100%;padding:16px;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.1);border-radius:14px;color:var(--text-primary);
+  font-family:inherit;font-size:.75rem;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
+  cursor:pointer;transition:all .3s;margin-top:16px}
+.modal .unlock-btn:hover{background:rgba(255,255,255,.14)}
+.modal .unlock-btn:active{transform:scale(.98)}
+.modal .error-msg{font-size:.7rem;color:rgba(255,80,80,.7);margin-top:10px;min-height:18px}
+.modal .success-msg{font-size:.7rem;color:rgba(120,255,120,.7);margin-top:10px}
 
-/* ---- STATUS ---- */
-.status{
-  text-align:center;
-  margin-top:20px;
-  font-size:0.6rem;
-  font-weight:300;
-  color:var(--text-muted);
-  letter-spacing:0.2em;
-  text-transform:uppercase;
-  min-height:18px;
-  transition:all 0.4s;
-}
-.status.ok{color:var(--success)}
-.status.err{color:rgba(255,80,80,0.7)}
-
-/* ---- PULSE DOT ---- */
-.pulse{
-  display:inline-block;
-  width:6px;height:6px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.3);
-  margin-right:6px;
-  vertical-align:middle;
-  animation:pulse-dot 3s ease-in-out infinite;
-}
-.pulse.live{background:rgba(120,255,120,0.5)}
-@keyframes pulse-dot{
-  0%,100%{opacity:0.4;transform:scale(1)}
-  50%{opacity:1;transform:scale(1.3)}
-}
-
-/* ---- RESPONSIVE ---- */
 @media(max-width:380px){
-  .header h1{font-size:2.4rem;letter-spacing:0.15em}
+  .header h1{font-size:2.4rem;letter-spacing:.15em}
   .model-card{padding:20px 14px 18px}
-  .model-card .icon{font-size:2rem}
   .slider-panel{padding:18px}
+  .modal{padding:28px 20px}
 }
 </style>
 </head>
 <body>
-
 <div class="container">
-
   <div class="header">
     <h1>Pantera</h1>
-    <div class="sub"><span class="pulse live"></span>control</div>
+    <div class="sub"><span class="pulse"></span>управление</div>
   </div>
 
   <div class="section">
-    <div class="section-label">engine</div>
+    <div class="section-label">движок</div>
     <div class="bento">
       <div class="glass model-card" data-model="gemini-3-flash-preview" onclick="selectModel(this)">
-        <span class="icon">&#9889;</span>
-        <div class="name">Flash</div>
-        <div class="desc">fast &middot; precise</div>
+        <div class="icon-wrap">
+          <svg viewBox="0 0 48 48" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round">
+            <path d="M24 4L28 18H38L30 26L34 40L24 32L14 40L18 26L10 18H20Z"/>
+          </svg>
+        </div>
+        <div class="name">Молния</div>
+        <div class="desc">быстрая и точная</div>
         <div class="tag">3-flash</div>
       </div>
-      <div class="glass model-card" data-model="gemini-3.1-pro-preview" onclick="selectModel(this)">
-        <span class="icon">&#9670;</span>
-        <div class="name">Pro</div>
-        <div class="desc">deep &middot; powerful</div>
+      <div class="glass model-card" data-model="gemini-3.1-pro-preview" id="proCard" onclick="handleProClick(this)">
+        <div class="lock-badge" id="lockBadge">
+          <svg viewBox="0 0 18 18" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round">
+            <rect x="3" y="8" width="12" height="8" rx="2"/><path d="M6 8V5a3 3 0 0 1 6 0v3"/>
+          </svg>
+        </div>
+        <div class="icon-wrap">
+          <svg viewBox="0 0 48 48" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round">
+            <path d="M24 4L6 14V34L24 44L42 34V14Z"/><path d="M24 4V44"/><path d="M6 14L42 34"/><path d="M42 14L6 34"/>
+          </svg>
+        </div>
+        <div class="name">Хищница</div>
+        <div class="desc">мощная и глубокая</div>
         <div class="tag">3.1-pro</div>
       </div>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-label">parameters</div>
-
+    <div class="section-label">параметры</div>
     <div class="glass slider-panel">
       <div class="slider-row">
-        <span class="label">Temperature</span>
+        <span class="label">Температура</span>
         <span class="val" id="tempVal">0.7</span>
       </div>
       <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7"
              oninput="document.getElementById('tempVal').textContent=parseFloat(this.value).toFixed(1)">
-      <div class="slider-hints">
-        <span>precise</span>
-        <span>creative</span>
-      </div>
+      <div class="slider-hints"><span>точная</span><span>креативная</span></div>
     </div>
-
     <div class="glass slider-panel">
       <div class="slider-row">
-        <span class="label">Thinking depth</span>
+        <span class="label">Глубина мышления</span>
         <span class="val" id="thinkVal">1024</span>
       </div>
       <input type="range" id="thinkSlider" min="0" max="8192" step="128" value="1024"
              oninput="document.getElementById('thinkVal').textContent=this.value">
-      <div class="slider-hints">
-        <span>instant</span>
-        <span>deep</span>
-      </div>
+      <div class="slider-hints"><span>мгновенно</span><span>глубоко</span></div>
     </div>
   </div>
 
-  <button class="save-btn" id="saveBtn" onclick="saveConfig()">apply</button>
+  <button class="save-btn" id="saveBtn" onclick="saveConfig()">применить</button>
   <div class="status" id="status"></div>
+</div>
 
+<!-- PRO UNLOCK MODAL -->
+<div class="overlay" id="proModal">
+  <div class="modal">
+    <div class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 12 12" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round">
+        <path d="M1 1L11 11M11 1L1 11"/>
+      </svg>
+    </div>
+    <h2>Хищница</h2>
+    <p>Pro-версия доступна подписчикам канала</p>
+
+    <div class="step">
+      <div class="step-num">шаг 1 — подписка</div>
+      <a href="https://t.me/+tHEoJ0Wt27o5YzEy" target="_blank" class="channel-btn">
+        <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9Z"/></svg>
+        Подписаться на канал
+      </a>
+    </div>
+
+    <div class="step">
+      <div class="step-num">шаг 2 — номер телефона</div>
+      <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 (___) ___-__-__" maxlength="18">
+    </div>
+
+    <div class="step">
+      <div class="step-num">шаг 3 — код доступа</div>
+      <input type="text" class="code-input" id="codeInput" placeholder="______" maxlength="7" inputmode="numeric">
+    </div>
+
+    <button class="unlock-btn" onclick="unlockPro()">Разблокировать</button>
+    <div class="error-msg" id="modalError"></div>
+  </div>
 </div>
 
 <script>
 let selectedModel='gemini-3-flash-preview';
+let proUnlocked=localStorage.getItem('pantera_pro')==='1';
+
+function initUI(){
+  if(proUnlocked){
+    document.getElementById('proCard').classList.add('unlocked');
+  }
+}
+initUI();
 
 function selectModel(el){
   document.querySelectorAll('.model-card').forEach(c=>c.classList.remove('active'));
@@ -745,14 +597,80 @@ function selectModel(el){
   selectedModel=el.dataset.model;
 }
 
+function handleProClick(el){
+  if(proUnlocked){
+    selectModel(el);
+  }else{
+    document.getElementById('proModal').classList.add('show');
+  }
+}
+
+function closeModal(){
+  document.getElementById('proModal').classList.remove('show');
+  document.getElementById('modalError').textContent='';
+}
+
+// phone mask
+document.getElementById('phoneInput').addEventListener('input',function(e){
+  let v=e.target.value.replace(/\D/g,'');
+  if(v.startsWith('8'))v='7'+v.slice(1);
+  if(!v.startsWith('7'))v='7'+v;
+  let f='+7';
+  if(v.length>1)f+=' ('+v.slice(1,4);
+  if(v.length>4)f+=') '+v.slice(4,7);
+  if(v.length>7)f+='-'+v.slice(7,9);
+  if(v.length>9)f+='-'+v.slice(9,11);
+  e.target.value=f;
+});
+
+// code mask: 888 888
+document.getElementById('codeInput').addEventListener('input',function(e){
+  let v=e.target.value.replace(/\D/g,'').slice(0,6);
+  if(v.length>3)v=v.slice(0,3)+' '+v.slice(3);
+  e.target.value=v;
+});
+
+async function unlockPro(){
+  const phone=document.getElementById('phoneInput').value.replace(/\D/g,'');
+  const code=document.getElementById('codeInput').value.replace(/\D/g,'');
+  const err=document.getElementById('modalError');
+
+  if(phone.length<11){err.textContent='Введите номер телефона';return}
+  if(code.length<6){err.textContent='Введите 6-значный код';return}
+
+  try{
+    const resp=await fetch('/pantera/unlock',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:phone,code:code})
+    });
+    const data=await resp.json();
+    if(data.ok){
+      proUnlocked=true;
+      localStorage.setItem('pantera_pro','1');
+      document.getElementById('proCard').classList.add('unlocked');
+      closeModal();
+      selectModel(document.getElementById('proCard'));
+    }else{
+      err.textContent=data.error||'Неверный код';
+    }
+  }catch(e){
+    err.textContent='Ошибка соединения';
+  }
+}
+
+// close on overlay click
+document.getElementById('proModal').addEventListener('click',function(e){
+  if(e.target===this)closeModal();
+});
+
 async function saveConfig(){
   const btn=document.getElementById('saveBtn');
   const status=document.getElementById('status');
   btn.textContent='...';
   try{
     const resp=await fetch('/pantera/save',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:selectedModel,
         temperature:parseFloat(document.getElementById('tempSlider').value),
@@ -761,25 +679,25 @@ async function saveConfig(){
     });
     const data=await resp.json();
     if(data.ok){
-      btn.textContent='applied';
-      btn.classList.add('saved');
-      status.textContent='settings saved';
-      status.className='status ok';
-      setTimeout(()=>{btn.textContent='apply';btn.classList.remove('saved')},2500);
+      btn.textContent='готово';btn.classList.add('saved');
+      status.textContent='настройки сохранены';status.className='status ok';
+      setTimeout(()=>{btn.textContent='применить';btn.classList.remove('saved')},2500);
     }else{throw new Error('fail')}
   }catch(e){
-    btn.textContent='error';
-    status.textContent='failed to save';
-    status.className='status err';
-    setTimeout(()=>{btn.textContent='apply'},2500);
+    btn.textContent='ошибка';status.textContent='не удалось сохранить';status.className='status err';
+    setTimeout(()=>{btn.textContent='применить'},2500);
   }
 }
 
 fetch('/pantera/config').then(r=>r.json()).then(cfg=>{
   selectedModel=cfg.model||'gemini-3-flash-preview';
   document.querySelectorAll('.model-card').forEach(c=>{
-    if(c.dataset.model===selectedModel) c.classList.add('active');
+    if(c.dataset.model===selectedModel)c.classList.add('active');
   });
+  if(selectedModel==='gemini-3.1-pro-preview'&&!proUnlocked){
+    selectedModel='gemini-3-flash-preview';
+    document.querySelector('[data-model="gemini-3-flash-preview"]').classList.add('active');
+  }
   document.getElementById('tempSlider').value=cfg.temperature||0.7;
   document.getElementById('tempVal').textContent=parseFloat(cfg.temperature||0.7).toFixed(1);
   document.getElementById('thinkSlider').value=cfg.thinking_budget||1024;
@@ -788,6 +706,8 @@ fetch('/pantera/config').then(r=>r.json()).then(cfg=>{
 </script>
 </body>
 </html>"""
+
+ACCESS_CODE = os.getenv("PRO_ACCESS_CODE", "888888")
 
 @app.get("/pantera", response_class=HTMLResponse)
 async def admin_panel():
@@ -813,6 +733,20 @@ async def save_config_endpoint(request: Request):
     except Exception as e:
         logger.error(f"Save config error: {e}")
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+@app.post("/pantera/unlock")
+async def unlock_pro(request: Request):
+    try:
+        body = await request.json()
+        phone = body.get("phone", "").strip()
+        code = body.get("code", "").strip()
+        if code == ACCESS_CODE:
+            logger.info(f"Pro unlocked by phone: {phone}")
+            return JSONResponse({"ok": True})
+        return JSONResponse({"ok": False, "error": "Неверный код"})
+    except Exception as e:
+        logger.error(f"Unlock error: {e}")
+        return JSONResponse({"ok": False, "error": "Ошибка сервера"})
 
 
 # --- Webhook setup ---
