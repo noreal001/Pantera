@@ -139,12 +139,14 @@ SYSTEM_PROMPT = """ПРОФИЛЬ И ХАРАКТЕР:
 
 
 # --- Telegram API ---
-async def telegram_send_message(chat_id, text, reply_markup=None):
+async def telegram_send_message(chat_id, text, reply_markup=None, business_connection_id=None):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
         payload = {"chat_id": chat_id, "text": text}
         if reply_markup:
             payload["reply_markup"] = reply_markup
+        if business_connection_id:
+            payload["business_connection_id"] = business_connection_id
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             resp = await client.post(url, json=payload)
             if resp.status_code != 200:
@@ -293,15 +295,15 @@ async def ask_gemini(question, user_id=None):
         return None
 
 # --- Обработка голосовых ---
-async def process_voice(voice, chat_id, user_id):
+async def process_voice(voice, chat_id, user_id, biz_id=None):
     try:
         file_id = voice["file_id"]
         duration = voice.get("duration", 0)
         if duration < 1:
-            await telegram_send_message(chat_id, "Голосовое сообщение слишком короткое.")
+            await telegram_send_message(chat_id, "Голосовое сообщение слишком короткое.", business_connection_id=biz_id)
             return
         if duration > 3600:
-            await telegram_send_message(chat_id, "Голосовое сообщение слишком длинное.")
+            await telegram_send_message(chat_id, "Голосовое сообщение слишком длинное.", business_connection_id=biz_id)
             return
         file_url = f"https://api.telegram.org/bot{TOKEN}/getFile?file_id={file_id}"
         async with httpx.AsyncClient() as client:
@@ -321,9 +323,9 @@ async def process_voice(voice, chat_id, user_id):
                 if text_content and not any(err in text_content for err in ["Ошибка", "Не удалось", "недоступно"]):
                     ai_answer = await ask_gemini(text_content, user_id)
                     if ai_answer:
-                        await telegram_send_message(chat_id, ai_answer)
+                        await telegram_send_message(chat_id, ai_answer, business_connection_id=biz_id)
                 else:
-                    await telegram_send_message(chat_id, text_content or "Не удалось распознать голосовое сообщение.")
+                    await telegram_send_message(chat_id, text_content or "Не удалось распознать голосовое сообщение.", business_connection_id=biz_id)
     except Exception as e:
         logger.error(f"Voice processing error: {e}\n{traceback.format_exc()}")
 
@@ -359,7 +361,7 @@ async def recognize_voice_content(file_content):
 
 
 # --- Обработка фото через GPT-5.2 Vision ---
-async def process_photo(photo, message, chat_id, user_id):
+async def process_photo(photo, message, chat_id, user_id, biz_id=None):
     try:
         file_id = photo[-1]["file_id"]
         caption = message.get("caption", "").strip()
@@ -385,7 +387,7 @@ async def process_photo(photo, message, chat_id, user_id):
 
         description = await describe_photo_vision(image_data, mime_type)
         if not description:
-            await telegram_send_message(chat_id, "Не удалось распознать фото.")
+            await telegram_send_message(chat_id, "Не удалось распознать фото.", business_connection_id=biz_id)
             return
 
         if caption:
@@ -395,7 +397,7 @@ async def process_photo(photo, message, chat_id, user_id):
 
         ai_answer = await ask_gemini(prompt, user_id)
         if ai_answer:
-            await telegram_send_message(chat_id, ai_answer)
+            await telegram_send_message(chat_id, ai_answer, business_connection_id=biz_id)
     except Exception as e:
         logger.error(f"Photo processing error: {e}\n{traceback.format_exc()}")
 
@@ -453,36 +455,47 @@ async def describe_photo_vision(image_base64, mime_type="image/jpeg"):
 async def telegram_webhook(update: dict, request: Request):
     try:
         logger.info(f"Webhook update: {json.dumps(update, ensure_ascii=False, default=str)[:500]}")
-        if "message" in update:
-            message = update["message"]
-            chat_id = message["chat"]["id"]
-            user_id = message["from"]["id"]
-            text = message.get("text", "").strip()
-            voice = message.get("voice")
-            photo = message.get("photo")
 
-            logger.info(f"chat_id={chat_id} text={text[:50] if text else ''} voice={bool(voice)} photo={bool(photo)}")
+        # Сохраняем business_connection при подключении
+        if "business_connection" in update:
+            bc = update["business_connection"]
+            logger.info(f"Business connection: id={bc.get('id')} user={bc.get('user',{}).get('id')} enabled={bc.get('is_enabled')}")
+            return {"ok": True}
 
-            if text == "/start":
-                await telegram_send_message(chat_id, "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос.")
-                return {"ok": True}
+        # Определяем источник сообщения: обычное или бизнес
+        message = update.get("message") or update.get("business_message")
+        if not message:
+            return {"ok": True}
 
-            if voice:
-                await send_typing_action(chat_id)
-                await process_voice(voice, chat_id, user_id)
-                return {"ok": True}
-            if photo:
-                await send_typing_action(chat_id)
-                await process_photo(photo, message, chat_id, user_id)
-                return {"ok": True}
-            if text:
-                await send_typing_action(chat_id)
-                ai_answer = await ask_gemini(text, user_id)
-                if ai_answer:
-                    await telegram_send_message(chat_id, ai_answer)
-                else:
-                    logger.error(f"Gemini returned None for chat_id={chat_id}")
-                return {"ok": True}
+        chat_id = message["chat"]["id"]
+        user_id = message["from"]["id"]
+        text = message.get("text", "").strip()
+        voice = message.get("voice")
+        photo = message.get("photo")
+        biz_id = message.get("business_connection_id")
+
+        logger.info(f"chat_id={chat_id} text={text[:50] if text else ''} voice={bool(voice)} photo={bool(photo)} biz={bool(biz_id)}")
+
+        if text == "/start" and not biz_id:
+            await telegram_send_message(chat_id, "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос.")
+            return {"ok": True}
+
+        if voice:
+            await send_typing_action(chat_id)
+            await process_voice(voice, chat_id, user_id, biz_id)
+            return {"ok": True}
+        if photo:
+            await send_typing_action(chat_id)
+            await process_photo(photo, message, chat_id, user_id, biz_id)
+            return {"ok": True}
+        if text:
+            await send_typing_action(chat_id)
+            ai_answer = await ask_gemini(text, user_id)
+            if ai_answer:
+                await telegram_send_message(chat_id, ai_answer, business_connection_id=biz_id)
+            else:
+                logger.error(f"Gemini returned None for chat_id={chat_id}")
+            return {"ok": True}
         return {"ok": True}
     except Exception as e:
         logger.error(f"Webhook error: {e}\n{traceback.format_exc()}")
