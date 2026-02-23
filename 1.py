@@ -22,6 +22,8 @@ BASE_WEBHOOK_URL = os.getenv('WEBHOOK_BASE_URL')
 WEBHOOK_PATH = "/webhook/ai-bear-123456"
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://snwbavhrnjpowuezrtyk.supabase.co')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 
 CONFIG_FILE = "bot_config.json"
 DEFAULT_CONFIG = {
@@ -137,10 +139,10 @@ SYSTEM_PROMPT = """ПРОФИЛЬ И ХАРАКТЕР:
 
 
 # --- Telegram API ---
-async def telegram_send_message(chat_id, text, reply_markup=None, parse_mode="HTML"):
+async def telegram_send_message(chat_id, text, reply_markup=None):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+        payload = {"chat_id": chat_id, "text": text}
         if reply_markup:
             payload["reply_markup"] = reply_markup
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
@@ -152,6 +154,56 @@ async def telegram_send_message(chat_id, text, reply_markup=None, parse_mode="HT
     except Exception as e:
         logger.error(f"Telegram API error: {e}")
         return False
+
+# --- Supabase ---
+async def supabase_get_user(chat_id):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/pantera?chat_id=eq.{chat_id}&select=*"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            resp = await client.get(url, headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}"
+            })
+            if resp.status_code == 200:
+                data = resp.json()
+                return data[0] if data else None
+    except Exception as e:
+        logger.error(f"Supabase get error: {e}")
+    return None
+
+async def supabase_save_user(chat_id, phone, first_name="", username=""):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/pantera"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            resp = await client.post(url, json={
+                "chat_id": chat_id,
+                "phone": phone,
+                "first_name": first_name,
+                "username": username
+            }, headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+            })
+            if resp.status_code in (200, 201):
+                logger.info(f"User saved: chat_id={chat_id}, phone={phone}")
+                return True
+            logger.error(f"Supabase save error: {resp.status_code} - {resp.text}")
+    except Exception as e:
+        logger.error(f"Supabase save error: {e}")
+    return False
+
+async def request_phone(chat_id):
+    await telegram_send_message(
+        chat_id,
+        "Для начала поделитесь, пожалуйста, Вашим номером телефона.",
+        reply_markup={
+            "keyboard": [[{"text": "Поделиться номером", "request_contact": True}]],
+            "resize_keyboard": True,
+            "one_time_keyboard": True
+        }
+    )
 
 async def send_typing_action(chat_id):
     try:
@@ -407,6 +459,39 @@ async def telegram_webhook(update: dict, request: Request):
             text = message.get("text", "").strip()
             voice = message.get("voice")
             photo = message.get("photo")
+            contact = message.get("contact")
+
+            # Обработка контакта — сохраняем номер
+            if contact:
+                phone = contact.get("phone_number", "")
+                first_name = contact.get("first_name", "")
+                username = message.get("from", {}).get("username", "")
+                saved = await supabase_save_user(chat_id, phone, first_name, username)
+                if saved:
+                    await telegram_send_message(
+                        chat_id,
+                        "Спасибо! Я Вас запомнила. Задавайте Ваш вопрос.",
+                        reply_markup={"remove_keyboard": True}
+                    )
+                else:
+                    await telegram_send_message(chat_id, "Произошла ошибка, попробуйте ещё раз.")
+                return {"ok": True}
+
+            # Проверяем регистрацию пользователя
+            user = await supabase_get_user(chat_id)
+
+            if text == "/start":
+                if user:
+                    await telegram_send_message(chat_id, "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос.")
+                else:
+                    await request_phone(chat_id)
+                return {"ok": True}
+
+            # Если номер не сохранён — просим
+            if not user:
+                await request_phone(chat_id)
+                return {"ok": True}
+
             if voice:
                 await send_typing_action(chat_id)
                 await process_voice(voice, chat_id, user_id)
@@ -414,10 +499,6 @@ async def telegram_webhook(update: dict, request: Request):
             if photo:
                 await send_typing_action(chat_id)
                 await process_photo(photo, message, chat_id, user_id)
-                return {"ok": True}
-            if text == "/start":
-                welcome = "Здравствуйте, я AI-Пантера, информационный помощник BAHUR. Задавайте Ваш вопрос."
-                await telegram_send_message(chat_id, welcome)
                 return {"ok": True}
             if text:
                 await send_typing_action(chat_id)
