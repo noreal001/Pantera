@@ -579,6 +579,12 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
   box-shadow:0 0 0 4px rgba(255,255,255,.05),0 2px 12px rgba(0,0,0,.6);cursor:pointer}
 .slider-hints{display:flex;justify-content:space-between;margin-top:10px;font-size:.55rem;
   font-weight:300;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase}
+.params-lock{position:absolute;inset:0;top:24px;background:rgba(5,5,5,.75);backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);border-radius:var(--radius);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;cursor:pointer;z-index:2;transition:opacity .3s}
+.params-lock span{font-size:.6rem;font-weight:400;color:var(--text-secondary);letter-spacing:.15em;text-transform:uppercase}
+.params-lock:hover{background:rgba(5,5,5,.65)}
+.params-lock.hidden{display:none}
 
 /* save btn */
 .save-btn{width:100%;padding:14px;background:rgba(255,255,255,.06);backdrop-filter:blur(20px);
@@ -678,7 +684,6 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
         </div>
         <div class="name">Молния</div>
         <div class="desc">быстрая и точная</div>
-        <div class="tag">3-flash</div>
       </div>
       <div class="glass model-card" data-model="gemini-3.1-pro-preview" id="proCard" onclick="handleProClick(this)">
         <div class="lock-badge" id="lockBadge">
@@ -693,12 +698,11 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
         </div>
         <div class="name">Хищница</div>
         <div class="desc">мощная и глубокая</div>
-        <div class="tag">3.1-pro</div>
       </div>
     </div>
   </div>
 
-  <div class="section">
+  <div class="section" id="paramsSection" style="position:relative">
     <div class="section-label">параметры</div>
     <div class="glass slider-panel">
       <div class="slider-row">
@@ -717,6 +721,12 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
       <input type="range" id="thinkSlider" min="0" max="8192" step="128" value="1024"
              oninput="document.getElementById('thinkVal').textContent=this.value">
       <div class="slider-hints"><span>мгновенно</span><span>глубоко</span></div>
+    </div>
+    <div class="params-lock" id="paramsLock" onclick="handleProClick(document.getElementById('proCard'))">
+      <svg viewBox="0 0 18 18" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" stroke-linecap="round" style="width:20px;height:20px;margin-bottom:6px">
+        <rect x="3" y="8" width="12" height="8" rx="2"/><path d="M6 8V5a3 3 0 0 1 6 0v3"/>
+      </svg>
+      <span>только для Хищницы</span>
     </div>
   </div>
 
@@ -798,7 +808,10 @@ if(isTgWebApp){
 }
 
 async function initUI(){
-  if(proUnlocked) document.getElementById('proCard').classList.add('unlocked');
+  if(proUnlocked){
+    document.getElementById('proCard').classList.add('unlocked');
+    document.getElementById('paramsLock').classList.add('hidden');
+  }
   // Проверяем номер в базе по chat_id
   if(userChatId){
     try{
@@ -902,6 +915,7 @@ async function unlockPro(){
       proUnlocked=true;
       localStorage.setItem('pantera_pro','1');
       document.getElementById('proCard').classList.add('unlocked');
+      document.getElementById('paramsLock').classList.add('hidden');
       closeModal();
       selectModel(document.getElementById('proCard'));
       if(isTgWebApp)tg.showAlert('Хищница разблокирована');
