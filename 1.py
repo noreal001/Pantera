@@ -231,7 +231,7 @@ async def ask_gemini(question, user_id=None):
         temperature = cfg["temperature"]
         thinking_budget = cfg["thinking_budget"]
 
-        url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
 
         contents = []
 
@@ -262,7 +262,7 @@ async def ask_gemini(question, user_id=None):
             }
         }
 
-        logger.info(f"Gemini request: model={model}, url_base=aiplatform.googleapis.com")
+        logger.info(f"Gemini request: model={model}")
         timeout = aiohttp.ClientTimeout(total=60)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(url, json=data) as resp:
