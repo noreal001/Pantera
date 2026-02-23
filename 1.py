@@ -668,12 +668,12 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
   </div>
 
   <div class="section">
-    <div class="section-label">движок</div>
+    <div class="section-label">тарифы</div>
     <div class="bento">
       <div class="glass model-card" data-model="gemini-3-flash-preview" onclick="selectModel(this)">
         <div class="icon-wrap">
-          <svg viewBox="0 0 48 48" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round">
-            <path d="M24 4L28 18H38L30 26L34 40L24 32L14 40L18 26L10 18H20Z"/>
+          <svg viewBox="0 0 48 48" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M26 4L10 28H24L22 44L38 20H24Z"/>
           </svg>
         </div>
         <div class="name">Молния</div>
