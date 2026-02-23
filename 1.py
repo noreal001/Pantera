@@ -1075,6 +1075,41 @@ async def shutdown_event():
 async def healthcheck():
     return PlainTextResponse("OK")
 
+@app.get("/debug")
+async def debug_status():
+    status = {
+        "TOKEN": bool(TOKEN),
+        "GEMINI_API_KEY": f"{GEMINI_API_KEY[:10]}..." if GEMINI_API_KEY else None,
+        "OPENAI_API_KEY": bool(OPENAI_API_KEY),
+        "SUPABASE_URL": SUPABASE_URL,
+        "SUPABASE_KEY": bool(SUPABASE_KEY),
+        "WEBHOOK_BASE_URL": BASE_WEBHOOK_URL,
+        "WEBHOOK_PATH": WEBHOOK_PATH,
+    }
+    # Test Gemini
+    try:
+        cfg = load_config()
+        test_url = f"https://generativelanguage.googleapis.com/v1beta/models/{cfg['model']}:generateContent?key={GEMINI_API_KEY}"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            resp = await client.post(test_url, json={"contents": [{"parts": [{"text": "test"}]}]})
+            status["gemini_test"] = f"{resp.status_code}"
+            if resp.status_code != 200:
+                status["gemini_error"] = resp.text[:300]
+    except Exception as e:
+        status["gemini_test"] = f"error: {e}"
+    # Test Supabase
+    if SUPABASE_KEY:
+        try:
+            sb_url = f"{SUPABASE_URL}/rest/v1/pantera?select=count&limit=1"
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                resp = await client.get(sb_url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"})
+                status["supabase_test"] = f"{resp.status_code}"
+                if resp.status_code != 200:
+                    status["supabase_error"] = resp.text[:300]
+        except Exception as e:
+            status["supabase_test"] = f"error: {e}"
+    return JSONResponse(status)
+
 # --- Запуск ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
