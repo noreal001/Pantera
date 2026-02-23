@@ -475,12 +475,23 @@ async def telegram_webhook(update: dict, request: Request):
 
             logger.info(f"chat_id={chat_id} text={text[:50] if text else ''} voice={bool(voice)} photo={bool(photo)} contact={bool(contact)}")
 
-            # Обработка контакта — сохраняем номер
+            # Обработка контакта — сохраняем номер и удаляем сообщение
             if contact:
                 phone = contact.get("phone_number", "")
                 first_name = contact.get("first_name", "")
                 username = message.get("from", {}).get("username", "")
+                message_id = message.get("message_id")
                 logger.info(f"Contact received: chat_id={chat_id}, phone={phone}")
+                # Удаляем сообщение с номером из чата
+                if message_id:
+                    try:
+                        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+                            await client.post(
+                                f"https://api.telegram.org/bot{TOKEN}/deleteMessage",
+                                json={"chat_id": chat_id, "message_id": message_id}
+                            )
+                    except Exception as e:
+                        logger.error(f"Delete message error: {e}")
                 saved = await supabase_save_user(chat_id, phone, first_name, username)
                 if saved:
                     await telegram_send_message(
