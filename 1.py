@@ -28,9 +28,23 @@ SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 CONFIG_FILE = "bot_config.json"
 DEFAULT_CONFIG = {
     "model": "gemini-3-flash-preview",
-    "temperature": 0.7,
-    "thinking_budget": 1024
+    "mode": "Обычная"
 }
+
+MODE_MAP = {
+    "Точная":     {"temperature": 0.1, "thinking_budget": 512},
+    "Деловая":    {"temperature": 0.3, "thinking_budget": 768},
+    "Быстрая":    {"temperature": 0.3, "thinking_budget": 256},
+    "Мягкая":     {"temperature": 0.5, "thinking_budget": 768},
+    "Обычная":    {"temperature": 0.7, "thinking_budget": 1024},
+    "Глубокая":   {"temperature": 0.7, "thinking_budget": 4096},
+    "Весёлая":    {"temperature": 1.2, "thinking_budget": 1024},
+    "Креативная": {"temperature": 1.5, "thinking_budget": 2048},
+    "Дерзкая":    {"temperature": 1.8, "thinking_budget": 2048},
+    "Максимум":   {"temperature": 2.0, "thinking_budget": 8192},
+}
+
+CHANNEL_ID = -1001874164448
 
 def load_config():
     try:
@@ -219,8 +233,10 @@ async def ask_gemini(question, user_id=None):
     try:
         cfg = load_config()
         model = cfg["model"]
-        temperature = cfg["temperature"]
-        thinking_budget = cfg["thinking_budget"]
+        mode_name = cfg.get("mode", "Обычная")
+        mode_params = MODE_MAP.get(mode_name, MODE_MAP["Обычная"])
+        temperature = mode_params["temperature"]
+        thinking_budget = mode_params["thinking_budget"]
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
 
@@ -255,37 +271,47 @@ async def ask_gemini(question, user_id=None):
 
         logger.info(f"Gemini request: model={model}")
         timeout = aiohttp.ClientTimeout(total=60)
+        max_retries = 3
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(url, json=data) as resp:
-                if resp.status != 200:
-                    error_text = await resp.text()
-                    logger.error(f"Gemini API error: {resp.status} - {error_text[:500]}")
-                    return None
+            for attempt in range(max_retries):
+                async with session.post(url, json=data) as resp:
+                    if resp.status == 503:
+                        error_text = await resp.text()
+                        logger.warning(f"Gemini 503 (attempt {attempt+1}/{max_retries}): {error_text[:200]}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2 * (attempt + 1))
+                            continue
+                        logger.error(f"Gemini 503 after {max_retries} retries")
+                        return None
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        logger.error(f"Gemini API error: {resp.status} - {error_text[:500]}")
+                        return None
 
-                result = await resp.json()
-                candidates = result.get("candidates", [])
-                if not candidates:
-                    logger.error(f"Gemini: no candidates in response")
-                    return None
+                    result = await resp.json()
+                    candidates = result.get("candidates", [])
+                    if not candidates:
+                        logger.error(f"Gemini: no candidates in response")
+                        return None
 
-                parts = candidates[0].get("content", {}).get("parts", [])
-                assistant_response = ""
-                for part in parts:
-                    if "text" in part and "thought" not in part:
-                        assistant_response = part["text"].strip()
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    assistant_response = ""
+                    for part in parts:
+                        if "text" in part and "thought" not in part:
+                            assistant_response = part["text"].strip()
 
-                if not assistant_response:
-                    return None
+                    if not assistant_response:
+                        return None
 
-                assistant_response = assistant_response.replace('*', '').replace('#', '').replace('`', '')
+                    assistant_response = assistant_response.replace('*', '').replace('#', '').replace('`', '')
 
-                if CONTEXT_ENABLED and user_id:
-                    try:
-                        add_assistant_message(user_id, assistant_response)
-                    except Exception as e:
-                        logger.error(f"Ошибка сохранения контекста: {e}")
+                    if CONTEXT_ENABLED and user_id:
+                        try:
+                            add_assistant_message(user_id, assistant_response)
+                        except Exception as e:
+                            logger.error(f"Ошибка сохранения контекста: {e}")
 
-                return assistant_response
+                    return assistant_response
 
     except asyncio.TimeoutError:
         logger.error("Gemini API timeout")
@@ -495,6 +521,7 @@ async def telegram_webhook(update: dict, request: Request):
                 await telegram_send_message(chat_id, ai_answer, business_connection_id=biz_id)
             else:
                 logger.error(f"Gemini returned None for chat_id={chat_id}")
+                await telegram_send_message(chat_id, "Извините, сервис временно перегружен. Попробуйте через минуту.", business_connection_id=biz_id)
             return {"ok": True}
         return {"ok": True}
     except Exception as e:
@@ -576,28 +603,27 @@ body::before{content:'';position:fixed;top:-40%;left:-20%;width:140%;height:140%
 .lock-badge svg{width:100%;height:100%}
 .model-card.unlocked .lock-badge{display:none}
 
-/* slider */
-.slider-panel{padding:18px;margin-bottom:8px}
-.slider-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
-.slider-row .label{font-size:.8rem;font-weight:400;color:var(--text-secondary);letter-spacing:.02em}
-.slider-row .val{font-size:1.6rem;font-weight:800;color:var(--text-primary);
-  font-variant-numeric:tabular-nums;min-width:56px;text-align:right;line-height:1}
-input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:2px;
-  background:rgba(255,255,255,.08);border-radius:1px;outline:none;margin:0;cursor:pointer}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;
-  background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.05),0 2px 12px rgba(0,0,0,.6);
-  cursor:pointer;transition:box-shadow .3s,transform .2s}
-input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 6px rgba(255,255,255,.08),0 2px 20px rgba(0,0,0,.8);transform:scale(1.1)}
-input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-radius:50%;background:#fff;
-  box-shadow:0 0 0 4px rgba(255,255,255,.05),0 2px 12px rgba(0,0,0,.6);cursor:pointer}
-.slider-hints{display:flex;justify-content:space-between;margin-top:10px;font-size:.55rem;
-  font-weight:300;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase}
-.params-lock{position:absolute;inset:0;top:24px;background:rgba(5,5,5,.75);backdrop-filter:blur(4px);
-  -webkit-backdrop-filter:blur(4px);border-radius:var(--radius);display:flex;flex-direction:column;
-  align-items:center;justify-content:center;cursor:pointer;z-index:2;transition:opacity .3s}
-.params-lock span{font-size:.6rem;font-weight:400;color:var(--text-secondary);letter-spacing:.15em;text-transform:uppercase}
-.params-lock:hover{background:rgba(5,5,5,.65)}
-.params-lock.hidden{display:none}
+/* mode grid */
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode-card{padding:14px 12px;cursor:pointer;text-align:center;border-radius:var(--radius);
+  background:var(--glass);border:1px solid var(--glass-border);position:relative;
+  transition:all .3s cubic-bezier(.16,1,.3,1);overflow:hidden}
+.mode-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent)}
+.mode-card .mode-name{font-size:.85rem;font-weight:600;color:var(--text-primary);
+  margin-bottom:3px;letter-spacing:.02em}
+.mode-card .mode-desc{font-size:.6rem;font-weight:300;color:var(--text-secondary);
+  letter-spacing:.04em;line-height:1.3}
+.mode-card .mode-params{font-size:.5rem;font-weight:400;color:var(--text-muted);
+  margin-top:8px;font-family:'SF Mono','Fira Code',monospace;letter-spacing:.03em}
+.mode-card:active{transform:scale(.97);transition:transform .1s}
+.mode-card.active{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);
+  box-shadow:0 4px 24px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.1)}
+.mode-card.active .mode-name{color:#fff}
+.mode-card.active::after{content:'';position:absolute;bottom:0;left:15%;right:15%;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);border-radius:1px}
+.mode-card.pro-locked{opacity:.45;pointer-events:none}
+.mode-card.pro-locked.unlocked{opacity:1;pointer-events:auto}
 
 /* save btn */
 .save-btn{width:100%;padding:14px;background:rgba(255,255,255,.06);backdrop-filter:blur(20px);
@@ -660,8 +686,6 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
   font-size:1rem;text-align:center;letter-spacing:.15em;outline:none;transition:border-color .3s}
 .modal input::placeholder{color:rgba(255,255,255,.15);letter-spacing:.1em}
 .modal input:focus{border-color:rgba(255,255,255,.2)}
-.modal .phone-input{font-size:.85rem;letter-spacing:.08em;margin-bottom:10px}
-.modal .code-input{font-size:1.4rem;font-weight:700;letter-spacing:.3em}
 .modal .unlock-btn{width:100%;padding:16px;background:rgba(255,255,255,.08);
   border:1px solid rgba(255,255,255,.1);border-radius:14px;color:var(--text-primary);
   font-family:inherit;font-size:.75rem;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
@@ -674,7 +698,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 @media(max-width:380px){
   .header h1{font-size:2.4rem;letter-spacing:.15em}
   .model-card{padding:20px 14px 18px}
-  .slider-panel{padding:18px}
+  .mode-card{padding:12px 10px}
   .modal{padding:28px 20px}
 }
 </style>
@@ -715,31 +739,59 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
     </div>
   </div>
 
-  <div class="section" id="paramsSection" style="position:relative">
-    <div class="section-label">параметры</div>
-    <div class="glass slider-panel">
-      <div class="slider-row">
-        <span class="label">Температура</span>
-        <span class="val" id="tempVal">0.7</span>
+  <div class="section" id="modeSection">
+    <div class="section-label">режим</div>
+    <div class="mode-grid" id="modeGrid">
+      <div class="mode-card" data-mode="Точная" onclick="selectMode(this)">
+        <div class="mode-name">Точная</div>
+        <div class="mode-desc">Чёткие факты без лишнего</div>
+        <div class="mode-params">t 0.1 · th 512</div>
       </div>
-      <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7"
-             oninput="document.getElementById('tempVal').textContent=parseFloat(this.value).toFixed(1)">
-      <div class="slider-hints"><span>точная</span><span>креативная</span></div>
-    </div>
-    <div class="glass slider-panel">
-      <div class="slider-row">
-        <span class="label">Глубина мышления</span>
-        <span class="val" id="thinkVal">1024</span>
+      <div class="mode-card" data-mode="Деловая" onclick="selectMode(this)">
+        <div class="mode-name">Деловая</div>
+        <div class="mode-desc">Строгий рабочий тон</div>
+        <div class="mode-params">t 0.3 · th 768</div>
       </div>
-      <input type="range" id="thinkSlider" min="0" max="8192" step="128" value="1024"
-             oninput="document.getElementById('thinkVal').textContent=this.value">
-      <div class="slider-hints"><span>мгновенно</span><span>глубоко</span></div>
-    </div>
-    <div class="params-lock" id="paramsLock" onclick="handleProClick(document.getElementById('proCard'))">
-      <svg viewBox="0 0 18 18" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" stroke-linecap="round" style="width:20px;height:20px;margin-bottom:6px">
-        <rect x="3" y="8" width="12" height="8" rx="2"/><path d="M6 8V5a3 3 0 0 1 6 0v3"/>
-      </svg>
-      <span>только для Хищницы</span>
+      <div class="mode-card" data-mode="Быстрая" onclick="selectMode(this)">
+        <div class="mode-name">Быстрая</div>
+        <div class="mode-desc">Коротко и по делу</div>
+        <div class="mode-params">t 0.3 · th 256</div>
+      </div>
+      <div class="mode-card" data-mode="Мягкая" onclick="selectMode(this)">
+        <div class="mode-name">Мягкая</div>
+        <div class="mode-desc">Тепло и дружелюбно</div>
+        <div class="mode-params">t 0.5 · th 768</div>
+      </div>
+      <div class="mode-card active" data-mode="Обычная" onclick="selectMode(this)">
+        <div class="mode-name">Обычная</div>
+        <div class="mode-desc">Идеальный баланс</div>
+        <div class="mode-params">t 0.7 · th 1024</div>
+      </div>
+      <div class="mode-card" data-mode="Глубокая" onclick="selectMode(this)">
+        <div class="mode-name">Глубокая</div>
+        <div class="mode-desc">Развёрнуто и вдумчиво</div>
+        <div class="mode-params">t 0.7 · th 4096</div>
+      </div>
+      <div class="mode-card pro-locked" data-mode="Весёлая" onclick="selectMode(this)">
+        <div class="mode-name">Весёлая</div>
+        <div class="mode-desc">С юмором и лёгкостью</div>
+        <div class="mode-params">t 1.2 · th 1024</div>
+      </div>
+      <div class="mode-card pro-locked" data-mode="Креативная" onclick="selectMode(this)">
+        <div class="mode-name">Креативная</div>
+        <div class="mode-desc">Нестандартный взгляд</div>
+        <div class="mode-params">t 1.5 · th 2048</div>
+      </div>
+      <div class="mode-card pro-locked" data-mode="Дерзкая" onclick="selectMode(this)">
+        <div class="mode-name">Дерзкая</div>
+        <div class="mode-desc">Провокация и вызов</div>
+        <div class="mode-params">t 1.8 · th 2048</div>
+      </div>
+      <div class="mode-card pro-locked" data-mode="Максимум" onclick="selectMode(this)">
+        <div class="mode-name">Максимум</div>
+        <div class="mode-desc">Все ресурсы на полную</div>
+        <div class="mode-params">t 2.0 · th 8192</div>
+      </div>
     </div>
   </div>
 
@@ -756,7 +808,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
       </svg>
     </div>
     <h2>Хищница</h2>
-    <p>Pro-версия доступна подписчикам канала</p>
+    <p>Pro-режимы доступны подписчикам канала</p>
 
     <div class="step">
       <div class="step-num">шаг 1 — подписка</div>
@@ -767,24 +819,10 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
     </div>
 
     <div class="step">
-      <div class="step-num">шаг 2 — номер телефона</div>
-      <div id="phoneShared" style="display:none;padding:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;font-size:.85rem;color:rgba(255,255,255,.7)">
-        <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 16 16" fill="none" stroke="rgba(120,255,120,.6)" stroke-width="1.5" stroke-linecap="round"><path d="M2 8.5L6 12.5L14 3.5"/></svg>
-        <span id="phoneDisplay"></span>
-      </div>
-      <button class="channel-btn" id="sharePhoneBtn" onclick="requestPhone()">
-        <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-        Поделиться номером
-      </button>
-      <input type="tel" class="phone-input" id="phoneInputFallback" placeholder="+7 (___) ___-__-__" maxlength="18" style="display:none;margin-top:8px">
+      <div class="step-num">шаг 2 — подтверждение</div>
+      <button class="unlock-btn" id="checkSubBtn" onclick="checkSubscription()">Подписался</button>
     </div>
 
-    <div class="step">
-      <div class="step-num">шаг 3 — код доступа</div>
-      <input type="text" class="code-input" id="codeInput" placeholder="______" maxlength="7" inputmode="numeric">
-    </div>
-
-    <button class="unlock-btn" onclick="unlockPro()">Разблокировать</button>
     <div class="error-msg" id="modalError"></div>
   </div>
 </div>
@@ -803,9 +841,10 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 
 <script>
 let selectedModel='gemini-3-flash-preview';
+let selectedMode='Обычная';
 let proUnlocked=localStorage.getItem('pantera_pro')==='1';
-let userPhone='';
 let userChatId='';
+const PRO_MODES=['Весёлая','Креативная','Дерзкая','Максимум'];
 const tg=window.Telegram&&window.Telegram.WebApp;
 const isTgWebApp=tg&&tg.initData&&tg.initData.length>0;
 
@@ -818,30 +857,40 @@ if(isTgWebApp){
   if(tg.initDataUnsafe&&tg.initDataUnsafe.user){
     userChatId=String(tg.initDataUnsafe.user.id);
   }
+  requestPhoneOnEntry();
 }
 
-async function initUI(){
+async function requestPhoneOnEntry(){
+  if(!userChatId)return;
+  try{
+    const resp=await fetch('/pantera/user/'+userChatId);
+    const data=await resp.json();
+    if(data.ok&&data.phone)return;
+  }catch(e){}
+  if(isTgWebApp&&tg.requestContact){
+    tg.requestContact(function(ok,evt){
+      if(ok&&evt&&evt.responseUnsafe&&evt.responseUnsafe.contact){
+        const contact=evt.responseUnsafe.contact;
+        const phone=contact.phone_number||'';
+        if(userChatId&&phone){
+          fetch('/pantera/save-phone',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              chat_id:userChatId,phone:phone,
+              first_name:contact.first_name||'',
+              username:(tg.initDataUnsafe&&tg.initDataUnsafe.user)?tg.initDataUnsafe.user.username||'':''
+            })
+          }).catch(e=>console.log('Phone save error',e));
+        }
+      }
+    });
+  }
+}
+
+function initUI(){
   if(proUnlocked){
     document.getElementById('proCard').classList.add('unlocked');
-    document.getElementById('paramsLock').classList.add('hidden');
-  }
-  // Проверяем номер в базе по chat_id
-  if(userChatId){
-    try{
-      const resp=await fetch('/pantera/user/'+userChatId);
-      const data=await resp.json();
-      if(data.ok&&data.phone){
-        userPhone=data.phone;
-        document.getElementById('sharePhoneBtn').style.display='none';
-        document.getElementById('phoneShared').style.display='block';
-        document.getElementById('phoneDisplay').textContent=formatPhone(userPhone);
-      }
-    }catch(e){}
-  }
-  // if not in Telegram and no phone, show fallback input
-  if(!isTgWebApp&&!userPhone){
-    document.getElementById('sharePhoneBtn').style.display='none';
-    document.getElementById('phoneInputFallback').style.display='block';
+    document.querySelectorAll('.mode-card.pro-locked').forEach(c=>c.classList.add('unlocked'));
   }
 }
 initUI();
@@ -850,6 +899,18 @@ function selectModel(el){
   document.querySelectorAll('.model-card').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
   selectedModel=el.dataset.model;
+}
+
+function selectMode(el){
+  const mode=el.dataset.mode;
+  if(PRO_MODES.includes(mode)&&!proUnlocked){
+    document.getElementById('proModal').classList.add('show');
+    return;
+  }
+  if(isTgWebApp&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+  document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  selectedMode=mode;
 }
 
 function handleProClick(el){
@@ -862,82 +923,35 @@ function closeModal(){
   document.getElementById('modalError').textContent='';
 }
 
-// Telegram native phone request
-function requestPhone(){
-  if(isTgWebApp&&tg.requestContact){
-    tg.requestContact(function(ok,evt){
-      if(ok&&evt&&evt.responseUnsafe&&evt.responseUnsafe.contact){
-        const contact=evt.responseUnsafe.contact;
-        userPhone=contact.phone_number||'';
-        document.getElementById('sharePhoneBtn').style.display='none';
-        document.getElementById('phoneShared').style.display='block';
-        document.getElementById('phoneDisplay').textContent=formatPhone(userPhone);
-      }
-    });
-  }else{
-    // fallback: show manual input
-    document.getElementById('sharePhoneBtn').style.display='none';
-    document.getElementById('phoneInputFallback').style.display='block';
-  }
-}
-
-function formatPhone(p){
-  let d=p.replace(/\D/g,'');
-  if(d.startsWith('8'))d='7'+d.slice(1);
-  if(!d.startsWith('7')&&d.length===10)d='7'+d;
-  if(d.length>=11)return '+'+d[0]+' ('+d.slice(1,4)+') '+d.slice(4,7)+'-'+d.slice(7,9)+'-'+d.slice(9,11);
-  return '+'+d;
-}
-
-// fallback phone mask
-document.getElementById('phoneInputFallback').addEventListener('input',function(e){
-  let v=e.target.value.replace(/\D/g,'');
-  if(v.startsWith('8'))v='7'+v.slice(1);
-  if(!v.startsWith('7'))v='7'+v;
-  let f='+7';
-  if(v.length>1)f+=' ('+v.slice(1,4);
-  if(v.length>4)f+=') '+v.slice(4,7);
-  if(v.length>7)f+='-'+v.slice(7,9);
-  if(v.length>9)f+='-'+v.slice(9,11);
-  e.target.value=f;
-});
-
-// code mask
-document.getElementById('codeInput').addEventListener('input',function(e){
-  let v=e.target.value.replace(/\D/g,'').slice(0,6);
-  if(v.length>3)v=v.slice(0,3)+' '+v.slice(3);
-  e.target.value=v;
-});
-
-async function unlockPro(){
-  const fallbackInput=document.getElementById('phoneInputFallback');
-  const phone=userPhone||fallbackInput.value.replace(/\D/g,'');
-  const code=document.getElementById('codeInput').value.replace(/\D/g,'');
+async function checkSubscription(){
   const err=document.getElementById('modalError');
-
-  if(phone.length<10){err.textContent='Поделитесь номером телефона';return}
-  if(code.length<6){err.textContent='Введите 6-значный код';return}
-
+  const btn=document.getElementById('checkSubBtn');
+  err.textContent='';
+  if(!userChatId){err.textContent='Откройте через Telegram';return}
+  btn.textContent='...';
   try{
-    const resp=await fetch('/pantera/unlock',{
+    const resp=await fetch('/pantera/check-subscription',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({phone:phone,code:code,chat_id:userChatId})
+      body:JSON.stringify({chat_id:userChatId})
     });
     const data=await resp.json();
-    if(data.ok){
+    if(data.ok&&data.subscribed){
       proUnlocked=true;
       localStorage.setItem('pantera_pro','1');
       document.getElementById('proCard').classList.add('unlocked');
-      document.getElementById('paramsLock').classList.add('hidden');
+      document.querySelectorAll('.mode-card.pro-locked').forEach(c=>c.classList.add('unlocked'));
       closeModal();
       selectModel(document.getElementById('proCard'));
+      if(isTgWebApp&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');
       if(isTgWebApp)tg.showAlert('Хищница разблокирована');
     }else{
-      err.textContent=data.error||'Неверный код';
+      err.textContent='Вы не подписаны на канал';
+      if(isTgWebApp&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('error');
     }
   }catch(e){
     err.textContent='Ошибка соединения';
   }
+  btn.textContent='Подписался';
 }
 
 document.getElementById('proModal').addEventListener('click',function(e){
@@ -951,19 +965,12 @@ async function saveConfig(){
   try{
     const resp=await fetch('/pantera/save',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:selectedModel,
-        temperature:parseFloat(document.getElementById('tempSlider').value),
-        thinking_budget:parseInt(document.getElementById('thinkSlider').value)
-      })
+      body:JSON.stringify({model:selectedModel,mode:selectedMode})
     });
     const data=await resp.json();
     if(data.ok){
-      // show success overlay
       document.getElementById('successOverlay').classList.add('show');
-      // haptic feedback in Telegram
       if(isTgWebApp&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');
-      // close app after delay
       setTimeout(()=>{
         if(isTgWebApp){tg.close()}
         else{
@@ -988,16 +995,21 @@ fetch('/pantera/config').then(r=>r.json()).then(cfg=>{
     selectedModel='gemini-3-flash-preview';
     document.querySelector('[data-model="gemini-3-flash-preview"]').classList.add('active');
   }
-  document.getElementById('tempSlider').value=cfg.temperature||0.7;
-  document.getElementById('tempVal').textContent=parseFloat(cfg.temperature||0.7).toFixed(1);
-  document.getElementById('thinkSlider').value=cfg.thinking_budget||1024;
-  document.getElementById('thinkVal').textContent=cfg.thinking_budget||1024;
+  selectedMode=cfg.mode||'Обычная';
+  document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('active'));
+  const activeMode=document.querySelector('[data-mode="'+selectedMode+'"]');
+  if(activeMode){
+    if(PRO_MODES.includes(selectedMode)&&!proUnlocked){
+      selectedMode='Обычная';
+      document.querySelector('[data-mode="Обычная"]').classList.add('active');
+    }else{
+      activeMode.classList.add('active');
+    }
+  }
 });
 </script>
 </body>
 </html>"""
-
-ACCESS_CODE = os.getenv("PRO_ACCESS_CODE", "888888")
 
 @app.get("/pantera", response_class=HTMLResponse)
 async def admin_panel():
@@ -1011,10 +1023,12 @@ async def get_config():
 async def save_config_endpoint(request: Request):
     try:
         body = await request.json()
+        mode = body.get("mode", "Обычная")
+        if mode not in MODE_MAP:
+            return JSONResponse({"ok": False, "error": "Invalid mode"}, status_code=400)
         cfg = {
             "model": body.get("model", DEFAULT_CONFIG["model"]),
-            "temperature": float(body.get("temperature", DEFAULT_CONFIG["temperature"])),
-            "thinking_budget": int(body.get("thinking_budget", DEFAULT_CONFIG["thinking_budget"]))
+            "mode": mode
         }
         if save_config(cfg):
             logger.info(f"Config updated: {cfg}")
@@ -1031,22 +1045,47 @@ async def get_user_phone(chat_id: int):
         return JSONResponse({"ok": True, "phone": user.get("phone", "")})
     return JSONResponse({"ok": False})
 
-@app.post("/pantera/unlock")
-async def unlock_pro(request: Request):
+@app.post("/pantera/save-phone")
+async def save_phone_endpoint(request: Request):
     try:
         body = await request.json()
-        phone = body.get("phone", "").strip()
-        code = body.get("code", "").strip()
         chat_id = body.get("chat_id")
-        if code == ACCESS_CODE:
-            # Если есть chat_id и номер, сохраняем в Supabase
-            if chat_id and phone:
-                await supabase_save_user(int(chat_id), phone)
-            logger.info(f"Pro unlocked by phone: {phone}")
-            return JSONResponse({"ok": True})
-        return JSONResponse({"ok": False, "error": "Неверный код"})
+        phone = body.get("phone", "").strip()
+        first_name = body.get("first_name", "")
+        username = body.get("username", "")
+        if not chat_id or not phone:
+            return JSONResponse({"ok": False, "error": "chat_id and phone required"}, status_code=400)
+        await supabase_save_user(int(chat_id), phone, first_name, username)
+        return JSONResponse({"ok": True})
     except Exception as e:
-        logger.error(f"Unlock error: {e}")
+        logger.error(f"Save phone error: {e}")
+        return JSONResponse({"ok": False, "error": "Ошибка сервера"})
+
+@app.post("/pantera/check-subscription")
+async def check_subscription(request: Request):
+    try:
+        body = await request.json()
+        chat_id = body.get("chat_id")
+        if not chat_id:
+            return JSONResponse({"ok": False, "error": "chat_id required"}, status_code=400)
+        url = f"https://api.telegram.org/bot{TOKEN}/getChatMember"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            resp = await client.post(url, json={"chat_id": CHANNEL_ID, "user_id": int(chat_id)})
+            if resp.status_code != 200:
+                logger.error(f"getChatMember error: {resp.status_code} - {resp.text}")
+                return JSONResponse({"ok": False, "error": "Не удалось проверить подписку"})
+            data = resp.json()
+            if not data.get("ok"):
+                return JSONResponse({"ok": False, "error": "Не удалось проверить подписку"})
+            status = data["result"].get("status", "")
+            is_member = status in ("member", "administrator", "creator")
+            if is_member:
+                logger.info(f"User {chat_id} is subscribed (status={status})")
+            else:
+                logger.info(f"User {chat_id} NOT subscribed (status={status})")
+            return JSONResponse({"ok": True, "subscribed": is_member})
+    except Exception as e:
+        logger.error(f"Check subscription error: {e}")
         return JSONResponse({"ok": False, "error": "Ошибка сервера"})
 
 
